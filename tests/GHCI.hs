@@ -25,27 +25,21 @@ import Text.Pretty.Simple
 
 $(chip "Chip123" 0xDE)
 
-newtype SMALL_REG = SMALL_REG Word8 deriving (Show)
-newtype LARGE_REG = LARGE_REG Word16 deriving (Show)
-
-instance Register1 SMALL_REG where
-    register1Address = 0xAD
-    register1Name = "SMALL_REG"
-
-instance Register2 LARGE_REG where
-    register2Address = 0x21
-    register2Name = "LARGE_REG"
-
+$(register1 "REG_WORD8"  0x10 0x0A)
+$(register2 "REG_WORD16" 0x20 0x0B0C)
 
 
 main :: IO ()
 main = do
     busdev <- openChip @Chip123 "/dev/null"
 
-    a <- regread1 @Chip123 busdev
-    b <- regread2 @Chip123 busdev
+    a <- regread1 busdev
+    b <- regread2 busdev
 
-    pPrint $ (a :: SMALL_REG)
-    pPrint $ (b :: LARGE_REG)
+    pPrint $ "REG_WORD8:  " <> show (a :: REG_WORD8)
+    pPrint $ "REG_WORD16: " <> show (b :: REG_WORD16)
+
+    pPrint $ "Default REG_WORD8:  " <> show (def :: REG_WORD8)
+    pPrint $ "Default REG_WORD16: " <> show (def :: REG_WORD16)
 
 

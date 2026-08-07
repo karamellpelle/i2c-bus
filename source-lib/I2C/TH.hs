@@ -22,24 +22,26 @@ module I2C.TH
 (
 
   chip,
-  --register1,
+  register1,
+  register2,
 
 ) where
 
 import Relude hiding (Type)
 import I2C.Class
+import Data.Default
 import Language.Haskell.TH
 import Language.Haskell.TH.Syntax
 import Language.Haskell.TH.Lib
 
 -- | declare a Chip type 'name' at _7_ bit bus address 'reg'
 --
--- > $(chip "BT4050" 0x22) -- =>
+-- > $(chip "Chip123" 0x22) -- =>
 -- >   
--- > data BT4050
--- > instance Chip BT4050 where
+-- > data Chip123
+-- > instance Chip Chip123 where
 -- >     chipAddress = 0x22
--- >     chipName = "BT4050"
+-- >     chipName = "Chip123"
 --
 chip :: String -> ChipAddress -> Q [Dec]
 chip name addr = do
@@ -63,39 +65,75 @@ chip name addr = do
 
 
 
--- | declare a Register of Chip 
+-- | declare a register of Chip containing Word8
 --
--- > $(register1 ''Chip123 "REG_A" 0xF0 0x01) =>
+-- > $(register1 "REG_SMALL" 0xF0 0x01) =>
 -- > 
--- >   newtype REG_A = REG_A Word8
+-- >   newtype REG_SMALL = REG_SMALL Word8
 -- >       deriving (Show)
--- >   instance Register Chip123 REG_A where
+-- >   instance Register1 REG_SMALL where
 -- >       registerAddress = 0xF0
--- >       registerName = "REG_A"
--- >   instance Default REG_A where
--- >       def = 0x01
+-- >       registerName = "REG_SMALL"
+-- >   instance Default REG_SMALL where
+-- >       def = REG_SMALL 0x01
 -- >
 -- >
 
-{-
-register1 :: Name -> String -> RegisterAddress -> Word8 -> Q [Dec]
-register1 chip name addr def = do
+register1 :: String -> RegisterAddress -> Word8 -> Q [Dec]
+register1 name addr def = do
     let name' = mkName name
     dNewtype <- decNewtype name' ''Word8 [''Show]
-    dInstanceRegister <- decInstanceRegister chip name' addr
-    --dDefault  <- decInstanceDefault name' def
-    --pure [dNewtype, dInstanceRegister]
-    pure [dNewtype, dInstanceRegister]
+    dInstanceRegister <- decInstanceRegister1 name' addr
+    dInstanceDefault <- decInstanceDefault name' def
+    pure [dNewtype, dInstanceRegister, dInstanceDefault]
     
     where
 
-      decInstanceRegister :: Name -> Name -> RegisterAddress -> Q Dec
-      decInstanceRegister cname tname addr = do
+      decInstanceRegister1 :: Name -> RegisterAddress -> Q Dec
+      decInstanceRegister1 tname addr = do
           let dAddress :: Q Dec
-              dAddress = funD 'registerAddress $ one $ clause [] (normalB $ litE $ integerL $ fromRegisterAddress addr) []
+              dAddress = funD 'register1Address $ one $ clause [] (normalB $ litE $ integerL $ fromRegisterAddress addr) []
               dName :: Q Dec
-              dName = funD 'registerName $ one $ clause [] (normalB $ litE $ stringL $ nameBase tname ) []
-          instanceD (cxt []) (appT (conT ''Register) (conT tname)) [dAddress, dName]
+              dName = funD 'register1Name $ one $ clause [] (normalB $ litE $ stringL $ nameBase tname ) []
+          instanceD (cxt []) (appT (conT ''Register1) (conT tname)) [dAddress, dName]
+
+decInstanceDefault :: Integral value => Name -> value -> Q Dec
+decInstanceDefault tname v = do
+    let dDef :: Q Dec
+        dDef = funD 'def $ one $ clause [] (normalB $ appE (conE tname) (litE $ integerL $ toInteger v)) []
+    instanceD (cxt []) (appT (conT ''Default) (conT tname)) [dDef]
+
+
+-- | declare a register of Chip containing Word8
+--
+-- > $(register1 "REG_LARGE" 0xF0 0x0123) =>
+-- > 
+-- >   newtype REG_LARGE = REG_LARGE Word8
+-- >       deriving (Show)
+-- >   instance Register2 REG_LARGE where
+-- >       registerAddress = 0xF0
+-- >       registerName = "REG_LARGE"
+-- >   instance Default REG_LARGE where
+-- >       def = 0x0123
+-- >
+-- >
+register2 :: String -> RegisterAddress -> Word16 -> Q [Dec]
+register2 name addr def = do
+    let name' = mkName name
+    dNewtype <- decNewtype name' ''Word16 [''Show]
+    dInstanceRegister <- decInstanceRegister2 name' addr
+    dInstanceDefault <- decInstanceDefault name' def
+    pure [dNewtype, dInstanceRegister, dInstanceDefault]
+    
+    where
+
+      decInstanceRegister2 :: Name -> RegisterAddress -> Q Dec
+      decInstanceRegister2 tname addr = do
+          let dAddress :: Q Dec
+              dAddress = funD 'register2Address $ one $ clause [] (normalB $ litE $ integerL $ fromRegisterAddress addr) []
+              dName :: Q Dec
+              dName = funD 'register2Name $ one $ clause [] (normalB $ litE $ stringL $ nameBase tname ) []
+          instanceD (cxt []) (appT (conT ''Register2) (conT tname)) [dAddress, dName]
 
 
 decNewtype :: Name -> Name -> [Name] -> Q Dec
@@ -112,7 +150,6 @@ normalC' tname ts =
     where
       helper :: Type -> BangType
       helper = \tp -> (Bang NoSourceUnpackedness NoSourceStrictness, tp)
--}
 
 {-
 FIXME: create TH functions for the following constructs

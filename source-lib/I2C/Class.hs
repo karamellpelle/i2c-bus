@@ -76,7 +76,7 @@ fromRegisterAddress :: Num b => RegisterAddress -> b
 fromRegisterAddress (RegisterAddress addr) = fromIntegral addr
 
 
--- | typeclass for a chip's registers .
+-- | typeclass for a chip's register containing 1 Word8.
 class Register1 reg where
     -- | register index inside Chip
     register1Address :: RegisterAddress
@@ -84,7 +84,7 @@ class Register1 reg where
     register1Name :: Text
     register1Name = show $ register1Address @reg
   
--- | typeclass for a chip's registers .
+-- | typeclass for a chip's register containing 1 Word16.
 class Register2 reg where
     -- | register index inside Chip
     register2Address :: RegisterAddress
