@@ -1,0 +1,124 @@
+---
+
+spec-version: 0.36.0
+
+name:
+    i2c-registers
+version:
+    0.2
+github:
+    karamellpelle/piradio
+homepage:
+    https://github.com/karamellpelle/i2c-registers
+license:
+    MIT
+license-file:
+    LICENSE
+author:
+    karamellpelle@hotmail.com
+maintainer:
+    karamellpelle@hotmail.com
+copyright:
+    karamellpelle@hotmail.com
+category:
+    - hardware
+    - chip
+    - i2c
+    - smbus
+extra-source-files:
+    - README.md
+    - CHANGELOG.md
+
+synopsis:
+    Typed I2C communication 
+
+description: |
+    Typed I2C communication 
+
+language: GHC2024 
+
+# build flags
+flags:
+  build-linux:
+      description: Use Linux backend
+      default: true
+      manual: true 
+  build-empty:
+      description: Use a dummy backend
+      default: false
+      manual: true 
+
+dependencies:
+    - base
+    - relude
+    - data-default
+    - template-haskell 
+
+ghc-options:
+    - -Wall
+    - -Wcompat
+    - -Widentities
+    - -Wincomplete-record-updates
+    - -Wincomplete-uni-patterns
+    - -Wmissing-export-lists
+    - -Wmissing-home-modules
+    - -Wpartial-fields
+    - -Wredundant-constraints
+    - -Wprepositive-qualified-module
+    - -Wno-name-shadowing
+    - -Wno-unused-top-binds
+    - -Wno-unused-matches
+    - -Wno-unused-imports
+
+default-extensions:
+    - NoImplicitPrelude
+    - OverloadedStrings
+
+library:
+    source-dirs: source-lib
+    exposed-modules:
+        - I2C
+        - I2C.TH
+    other-extensions:
+        - CPP
+    when: 
+      - condition: flag(build-empty)
+        exposed-modules:
+          - I2C.Internal.Empty
+
+      - condition: flag(build-linux)
+        exposed-modules:
+          - I2C.Internal.Linux
+        dependencies: 
+          - unix
+        c-sources: 
+          - cbits/smbus.c
+        include-dirs: 
+          - include
+        other-extensions:
+          - ForeignFunctionInterface
+
+when:
+  - condition: flag(build-empty)
+    cpp-options: -DI2C_INTERNAL_EMPTY
+  - condition: flag(build-linux)
+    cpp-options: -DI2C_INTERNAL_LINUX
+
+tests:
+    empty:
+        source-dirs: tests/empty/
+        main:        Main.hs
+        cpp-options: -DI2C_INTERNAL_EMPTY
+        ghc-options:
+            - -threaded
+            - -rtsopts
+            - -with-rtsopts "-N -T"
+            - -Wno-unused-packages
+        dependencies:
+            - i2c-registers
+            - pretty-simple
+            #- hedgehog
+            #- tasty
+            #- tasty-hedgehog
+            #- tasty-hunit
+

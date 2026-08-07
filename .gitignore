@@ -1,0 +1,13 @@
+.stack-work/
+*~
+*.swp
+.*.swo
+tarballs/
+.stack-work/
+.DS_Store
+gmon.out
+leaks-*.txt
+session.vim
+tmp
+*.cabal
+stack.yaml.lock
