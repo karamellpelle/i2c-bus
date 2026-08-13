@@ -60,7 +60,7 @@ class Chip a where
 
 
 --------------------------------------------------------------------------------
---  registers
+--  registers addressing inside chips
 
 -- | register address
 newtype RegisterAddress = RegisterAddress Word8

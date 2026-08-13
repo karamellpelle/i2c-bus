@@ -1,5 +1,5 @@
 # TODO
-* rename `readX/writeX/modifyX` into `regreadX/regwriteX/regmodifyX`.
+* rename `regreadX/regwriteX/regmodifyX` into `smbusxxxY`
 * Linux: set BusDevice options: timeout etc
 * Template Haskell functions
 * rename `readX -> smbusreadX`, `Internal.readDataX -> Internal.readSMBusX`

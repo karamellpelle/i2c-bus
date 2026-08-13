@@ -78,7 +78,6 @@ library:
     source-dirs: source-lib
     exposed-modules:
         - I2C
-        - I2C.TH
     other-extensions:
         - CPP
     when: 

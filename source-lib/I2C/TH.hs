@@ -21,32 +21,25 @@
 {-# LANGUAGE CPP #-}
 module I2C.TH
 (
-
   chip,
   register1,
   register2,
 
-  regread1',
-  regwrite1',
-  regmodify1',
-  regread2',
-  regwrite2',
-  regmodify2',
 ) where
 
 import Relude hiding (Type)
-import I2C
+import I2C.Internal
 import Data.Default
+import Numeric
+import Text.Show qualified
+import Data.Char (toUpper)
+
 import Language.Haskell.TH
 import Language.Haskell.TH.Syntax
 import Language.Haskell.TH.Lib
 
-#ifdef I2C_INTERNAL_LINUX
-import I2C.Internal.Linux qualified as Internal
-#endif
-#ifdef I2C_INTERNAL_EMPTY
-import I2C.Internal.Empty qualified as Internal
-#endif
+--------------------------------------------------------------------------------
+--  Template Haskell 
 
 -- | declare a Chip type 'name' at _7_ bit bus address 'reg'
 --
@@ -79,7 +72,7 @@ chip name addr = do
 
 
 
--- | declare a register of Chip containing Word8
+-- | declare a register of Chip that contains Word8
 --
 -- > $(register1 "REG_SMALL" 0xF0 0x01) =>
 -- > 
@@ -93,16 +86,15 @@ chip name addr = do
 -- >       regmodify = regmodify1'
 -- >   instance Default REG_SMALL where
 -- >       def = REG_SMALL 0x01
--- >
--- >
-
+-- 
 register1 :: String -> RegisterAddress -> Word8 -> Q [Dec]
 register1 name addr def = do
     let name' = mkName name
-    dNewtype <- decNewtype name' ''Word8 [''Show]
+    dNewtype <- decNewtype name' ''Word8 []
     dInstanceRegister <- decInstanceRegister name' addr
     dInstanceDefault <- decInstanceDefault name' def
-    pure [dNewtype, dInstanceRegister, dInstanceDefault]
+    dInstanceShow <- decInstanceShow name' 
+    pure [dNewtype, dInstanceRegister, dInstanceDefault, dInstanceShow]
     
     where
 
@@ -110,19 +102,18 @@ register1 name addr def = do
       decInstanceRegister tname addr = do
           let dAddress = funD 'registerAddress $ one $ clause [] (normalB $ litE $ integerL $ fromRegisterAddress addr) []
               dName = funD 'registerName $ one $ clause [] (normalB $ litE $ stringL $ nameBase tname ) []
-              dRead = funD 'regread $ one $ clause [] (normalB $ varE 'regread1') []
-              dWrite = funD 'regwrite $ one $ clause [] (normalB $ varE 'regwrite1') []
-              dModify = funD 'regmodify $ one $ clause [] (normalB $ varE 'regmodify1') []
+              dRead = decFunctionAlias 'regread 'regread1'
+              dWrite = decFunctionAlias 'regwrite 'regwrite1'
+              dModify = decFunctionAlias 'regmodify 'regmodify1'
           instanceD (cxt []) (appT (conT ''Register) (conT tname)) [dAddress, dName, dRead, dWrite, dModify]
 
-decInstanceDefault :: Integral value => Name -> value -> Q Dec
-decInstanceDefault tname v = do
-    let dDef :: Q Dec
-        dDef = funD 'def $ one $ clause [] (normalB $ appE (conE tname) (litE $ integerL $ toInteger v)) []
-    instanceD (cxt []) (appT (conT ''Default) (conT tname)) [dDef]
+      decInstanceShow :: Name -> Q Dec
+      decInstanceShow tname =
+          instanceD (cxt []) (appT (conT ''Show) (conT tname)) $ one $ decFunctionAlias 'Text.Show.show 'showRegister1
 
 
--- | declare a register of Chip containing Word8
+
+-- | declare a register of Chip that contains Word16
 --
 -- > $(register1 "REG_LARGE" 0xF0 0x0123) =>
 -- > 
@@ -135,15 +126,15 @@ decInstanceDefault tname v = do
 -- >       regwrite = regwrite2'
 -- >   instance Default REG_LARGE where
 -- >       def = 0x0123
--- >
--- >
+-- 
 register2 :: String -> RegisterAddress -> Word16 -> Q [Dec]
 register2 name addr def = do
     let name' = mkName name
-    dNewtype <- decNewtype name' ''Word16 [''Show]
+    dNewtype <- decNewtype name' ''Word16 []
     dInstanceRegister <- decInstanceRegister name' addr
     dInstanceDefault <- decInstanceDefault name' def
-    pure [dNewtype, dInstanceRegister, dInstanceDefault]
+    dInstanceShow <- decInstanceShow name' 
+    pure [dNewtype, dInstanceRegister, dInstanceDefault, dInstanceShow]
     
     where
 
@@ -151,10 +142,14 @@ register2 name addr def = do
       decInstanceRegister tname addr = do
           let dAddress = funD 'registerAddress $ one $ clause [] (normalB $ litE $ integerL $ fromRegisterAddress addr) []
               dName = funD 'registerName $ one $ clause [] (normalB $ litE $ stringL $ nameBase tname ) []
-              dRead = funD 'regread $ one $ clause [] (normalB $ varE 'regread2') []
-              dWrite = funD 'regwrite $ one $ clause [] (normalB $ varE 'regwrite2') []
-              dModify = funD 'regmodify $ one $ clause [] (normalB $ varE 'regmodify2') []
+              dRead = decFunctionAlias 'regread 'regread2'
+              dWrite = decFunctionAlias 'regwrite 'regwrite2'
+              dModify = decFunctionAlias 'regmodify 'regmodify2'
           instanceD (cxt []) (appT (conT ''Register) (conT tname)) [dAddress, dName, dRead, dWrite, dModify]
+    
+      decInstanceShow :: Name -> Q Dec
+      decInstanceShow tname =
+          instanceD (cxt []) (appT (conT ''Show) (conT tname)) $ one $ decFunctionAlias 'Text.Show.show 'showRegister2
 
 
 
@@ -200,13 +195,19 @@ bitsToField bitstr = strip 0 bitstr
 --------------------------------------------------------------------------------
 --  helpers
 
+decInstanceDefault :: Integral value => Name -> value -> Q Dec
+decInstanceDefault tname v = do
+    let dDef :: Q Dec
+        dDef = funD 'def $ one $ clause [] (normalB $ appE (conE tname) (litE $ integerL $ toInteger v)) []
+    instanceD (cxt []) (appT (conT ''Default) (conT tname)) [dDef]
+
+
 decNewtype :: Name -> Name -> [Name] -> Q Dec
 decNewtype tname tname' tderivs = 
     newtypeD (cxt []) tname [] Nothing (normalC' tname [conT tname']) $ fmap derive tderivs
     where
       derive :: Name -> Q DerivClause
       derive tname = derivClause Nothing $ [conT $ tname] 
-
 
 normalC' :: Quote m => Name -> [m Type] -> m Con
 normalC' tname ts =
@@ -215,47 +216,31 @@ normalC' tname ts =
       helper :: Type -> BangType
       helper = \tp -> (Bang NoSourceUnpackedness NoSourceStrictness, tp)
 
-              
-regread1' :: forall chip reg m . (Chip chip, Register reg, Coercible Word8 reg, MonadIO m) => 
-            Internal.BusDevice chip -> m reg
-regread1' busdev = 
-    fmap coerce $ regread1 @chip busdev (registerAddress @reg)
+decFunctionAlias :: Name -> Name -> Q Dec
+decFunctionAlias a b = 
+    funD a $ one $ clause [] (normalB $ varE b) []
 
-regwrite1' :: forall chip reg m . (Chip chip, Register reg, Coercible Word8 reg, Default reg, MonadIO m) => 
-            Internal.BusDevice chip -> (reg -> reg) -> m reg
-regwrite1' busdev = \f -> do
-    let r' = f def
-    regwrite1 @chip busdev (registerAddress @reg) (coerce $ r')
-    pure r'
+showRegister1 :: forall reg . (Register reg, Coercible Word8 reg) => reg -> String
+showRegister1 reg = 
+    (toString $ registerName @reg) <> "(" <> showWord8 (coerce reg) <> ")"
+    --(toString $ registerName @reg) <> "==" <> showWord8 (coerce reg) 
 
-regmodify1' :: forall chip reg m . (Chip chip, Register reg, Coercible Word8 reg, MonadIO m) => 
-            Internal.BusDevice chip -> (reg -> reg) -> m reg
-regmodify1' busdev = \f -> do
-    r <- regread1' busdev
-    let r' = f r
-    regwrite1 busdev (registerAddress @reg) $ coerce $ r'
-    pure r'
+showRegister2 :: forall reg . (Register reg, Coercible Word16 reg) => reg -> String
+showRegister2 reg = 
+    (toString $ registerName @reg) <> "(" <> showWord16 (coerce reg) <> ")"
+    --(toString $ registerName @reg) <> "==" <> showWord16 (coerce reg) 
 
-     
-regread2' :: forall chip reg m . (Chip chip, Register reg, Coercible Word16 reg, MonadIO m) => 
-            Internal.BusDevice chip -> m reg
-regread2' busdev =
-    fmap coerce $ regread2 @chip busdev (registerAddress @reg)
+--------------------------------------------------------------------------------
+--  
 
-regwrite2' :: forall chip reg m . (Chip chip, Register reg, Coercible Word16 reg, Default reg, MonadIO m) => 
-            Internal.BusDevice chip -> (reg -> reg) -> m reg
-regwrite2' busdev = \f -> do
-    let r' = f def
-    regwrite2 @chip busdev (registerAddress @reg) $ coerce $ r'
-    pure r'
+showWord8 :: Word8 -> String
+showWord8 = showWordN 2
 
-regmodify2' :: forall chip reg m . (Chip chip, Register reg, Coercible Word16 reg, MonadIO m) => 
-            Internal.BusDevice chip -> (reg -> reg) -> m reg
-regmodify2' busdev = \f -> do
-    r <- regread2' busdev
-    let r' = f r
-    regwrite2 busdev (registerAddress @reg) $ coerce $ r'
-    pure r'
+showWord16 :: Word16 -> String
+showWord16 = showWordN 4 
 
--- TODO: regxxxN
-
+showWordN :: Integral a => Int -> a -> String
+showWordN n w =
+    let str = fmap toUpper $ showHex w ""
+        n'  = if length str <= n then n - length str else 0
+    in replicate n' '0' <> str
