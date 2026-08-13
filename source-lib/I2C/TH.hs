@@ -85,9 +85,12 @@ chip name addr = do
 -- > 
 -- >   newtype REG_SMALL = REG_SMALL Word8
 -- >       deriving (Show)
--- >   instance Register1 REG_SMALL where
+-- >   instance Register REG_SMALL where
 -- >       registerAddress = 0xF0
 -- >       registerName = "REG_SMALL"
+-- >       regread = regread1'
+-- >       regwrite = regwrite1'
+-- >       regmodify = regmodify1'
 -- >   instance Default REG_SMALL where
 -- >       def = REG_SMALL 0x01
 -- >
@@ -97,20 +100,20 @@ register1 :: String -> RegisterAddress -> Word8 -> Q [Dec]
 register1 name addr def = do
     let name' = mkName name
     dNewtype <- decNewtype name' ''Word8 [''Show]
-    --dInstanceRegister <- decInstanceRegister1 name' addr
+    dInstanceRegister <- decInstanceRegister name' addr
     dInstanceDefault <- decInstanceDefault name' def
-    --pure [dNewtype, dInstanceRegister, dInstanceDefault]
-    pure [dNewtype, dInstanceDefault]
+    pure [dNewtype, dInstanceRegister, dInstanceDefault]
     
     where
 
       decInstanceRegister :: Name -> RegisterAddress -> Q Dec
       decInstanceRegister tname addr = do
-          let dAddress :: Q Dec
-              dAddress = funD 'registerAddress $ one $ clause [] (normalB $ litE $ integerL $ fromRegisterAddress addr) []
-              dName :: Q Dec
+          let dAddress = funD 'registerAddress $ one $ clause [] (normalB $ litE $ integerL $ fromRegisterAddress addr) []
               dName = funD 'registerName $ one $ clause [] (normalB $ litE $ stringL $ nameBase tname ) []
-          instanceD (cxt []) (appT (conT ''Register) (conT tname)) [dAddress, dName]
+              dRead = funD 'regread $ one $ clause [] (normalB $ varE 'regread1') []
+              dWrite = funD 'regwrite $ one $ clause [] (normalB $ varE 'regwrite1') []
+              dModify = funD 'regmodify $ one $ clause [] (normalB $ varE 'regmodify1') []
+          instanceD (cxt []) (appT (conT ''Register) (conT tname)) [dAddress, dName, dRead, dWrite, dModify]
 
 decInstanceDefault :: Integral value => Name -> value -> Q Dec
 decInstanceDefault tname v = do
@@ -128,6 +131,8 @@ decInstanceDefault tname v = do
 -- >   instance Register2 REG_LARGE where
 -- >       registerAddress = 0xF0
 -- >       registerName = "REG_LARGE"
+-- >       regread = regread2'
+-- >       regwrite = regwrite2'
 -- >   instance Default REG_LARGE where
 -- >       def = 0x0123
 -- >
@@ -136,36 +141,22 @@ register2 :: String -> RegisterAddress -> Word16 -> Q [Dec]
 register2 name addr def = do
     let name' = mkName name
     dNewtype <- decNewtype name' ''Word16 [''Show]
-    --dInstanceRegister <- decInstanceRegister2 name' addr
+    dInstanceRegister <- decInstanceRegister name' addr
     dInstanceDefault <- decInstanceDefault name' def
-    --pure [dNewtype, dInstanceRegister, dInstanceDefault]
-    pure [dNewtype,  dInstanceDefault]
+    pure [dNewtype, dInstanceRegister, dInstanceDefault]
     
     where
 
       decInstanceRegister :: Name -> RegisterAddress -> Q Dec
       decInstanceRegister tname addr = do
-          let dAddress :: Q Dec
-              dAddress = funD 'registerAddress $ one $ clause [] (normalB $ litE $ integerL $ fromRegisterAddress addr) []
-              dName :: Q Dec
+          let dAddress = funD 'registerAddress $ one $ clause [] (normalB $ litE $ integerL $ fromRegisterAddress addr) []
               dName = funD 'registerName $ one $ clause [] (normalB $ litE $ stringL $ nameBase tname ) []
-          instanceD (cxt []) (appT (conT ''Register) (conT tname)) [dAddress, dName]
+              dRead = funD 'regread $ one $ clause [] (normalB $ varE 'regread2') []
+              dWrite = funD 'regwrite $ one $ clause [] (normalB $ varE 'regwrite2') []
+              dModify = funD 'regmodify $ one $ clause [] (normalB $ varE 'regmodify2') []
+          instanceD (cxt []) (appT (conT ''Register) (conT tname)) [dAddress, dName, dRead, dWrite, dModify]
 
 
-decNewtype :: Name -> Name -> [Name] -> Q Dec
-decNewtype tname tname' tderivs = 
-    newtypeD (cxt []) tname [] Nothing (normalC' tname [conT tname']) $ fmap derive tderivs
-    where
-      derive :: Name -> Q DerivClause
-      derive tname = derivClause Nothing $ [conT $ tname] 
-
-
-normalC' :: Quote m => Name -> [m Type] -> m Con
-normalC' tname ts =
-    normalC tname (fmap (fmap helper) ts)
-    where
-      helper :: Type -> BangType
-      helper = \tp -> (Bang NoSourceUnpackedness NoSourceStrictness, tp)
 
 {-
 FIXME: create TH functions for the following constructs
@@ -209,6 +200,22 @@ bitsToField bitstr = strip 0 bitstr
 --------------------------------------------------------------------------------
 --  helpers
 
+decNewtype :: Name -> Name -> [Name] -> Q Dec
+decNewtype tname tname' tderivs = 
+    newtypeD (cxt []) tname [] Nothing (normalC' tname [conT tname']) $ fmap derive tderivs
+    where
+      derive :: Name -> Q DerivClause
+      derive tname = derivClause Nothing $ [conT $ tname] 
+
+
+normalC' :: Quote m => Name -> [m Type] -> m Con
+normalC' tname ts =
+    normalC tname (fmap (fmap helper) ts)
+    where
+      helper :: Type -> BangType
+      helper = \tp -> (Bang NoSourceUnpackedness NoSourceStrictness, tp)
+
+              
 regread1' :: forall chip reg m . (Chip chip, Register reg, Coercible Word8 reg, MonadIO m) => 
             Internal.BusDevice chip -> m reg
 regread1' busdev = 

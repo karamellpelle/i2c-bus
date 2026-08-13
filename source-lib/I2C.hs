@@ -31,28 +31,15 @@ module I2C
 
     Register (..),
 
-    --regread1',
-    --regread2',
-    ----regreadN,
-    --regwrite1',
-    --regwrite2',
-    ----regwriteN,
-    --regmodify1',
-    --regmodify2',
-    --regmodifyN,
-
-    --read0,
     regread1,
     regread2,
-    --readN,
-    --write0,
+    --regreadN,
     regwrite1,
     regwrite2,
-    --writeN,
-    --modify0,
+    --regwriteN,
     regmodify1,
     regmodify2,
-    --modifyN,
+    --regmodifyN,
 ) where
 
 import Relude hiding (modify)
@@ -80,6 +67,7 @@ class Register reg where
     registerName :: Text
     registerName = show $ registerAddress @reg
 
+    -- | bus functions
     regread   :: (Chip chip, MonadIO m) => Internal.BusDevice chip -> m reg
     regwrite  :: (Chip chip, MonadIO m) => Internal.BusDevice chip -> (reg -> reg) -> m reg
     regmodify :: (Chip chip, MonadIO m) => Internal.BusDevice chip -> (reg -> reg) -> m reg
