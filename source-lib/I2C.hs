@@ -31,6 +31,8 @@ module I2C
     openChip,
     closeChip,
 
+    rawread,
+    rawwrite,
     
     module I2C.TH,
 ) where

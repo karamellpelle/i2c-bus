@@ -35,8 +35,8 @@ module I2C.Internal.Linux
     writeData2,
     --writeDataN,
 
-    --readRaw
-    --writeRaw,
+    readRaw,
+    writeRaw,
     
 
 ) where
@@ -50,9 +50,8 @@ import System.Posix.Types
 import Numeric
 import Text.Show qualified
 
-import Foreign.Ptr
-import Foreign.C.Types
-import Foreign.C.Error
+import Foreign
+import Foreign.C
 import Control.Exception
 import GHC.IO.Exception
 import Data.Char (toUpper)
@@ -84,11 +83,11 @@ openChip ident = do
         Left err   -> throwIO $ fromIOException err
         Right fd   -> do
             let addr = chipAddress @chip
-            _ <- assertOK (tagErr ident addr) $ c_ioctl (fromIntegral fd) I2C_SLAVE_FORCE (fromChipAddress addr) 
+            _ <- assertOK (tagErr ident addr) $ c_ioctl (fromIntegral fd) I2C_SLAVE_FORCE (fromChipAddress addr)
             pure $ BusDevice @chip ident $ fdToPtrI2C_Client fd
     where
       fromIdentifier = toString
-      tagErr ident addr = "openChip " <> show addr <> "@" <> show ident
+      tagErr ident addr = "openChip: could not find " <> chipName @chip <> " at " <> show addr <> " on bus " <> show ident
 
 -- | close connection to chip
 closeChip :: forall chip . (Chip chip) => BusDevice chip -> IO ()
@@ -161,8 +160,7 @@ writeData2 busdev@(BusDevice _id ptr) regaddr = \w -> do
 
 --------------------------------------------------------------------------------
 --  raw I2C read/write, no registers (SMBus free)
-
---  TODO: use C's `read`/`write` on file descriptor.
+--
 --  from https://www.kernel.org/doc/html/latest/i2c/dev-interface.html :
 -- > /*
 -- >  * Using I2C Write, equivalent of
@@ -182,8 +180,37 @@ writeData2 busdev@(BusDevice _id ptr) regaddr = \w -> do
 -- >   /* buf[0] contains the read byte */
 -- > }
 
---readRaw :: forall chip . (Chip chip) => BusDevice chip -> IO ByteString         -- or something
---writeRaw :: forall chip . (Chip chip) => BusDevice chip -> ByteString -> IO ()  -- or something
+-- |  read data in BusDevice
+--  FIXME: do we need some alignment restrictions on 'a'? cf. docs for `Storable.alignment|peek`
+--          however, 'allocaBytesAligned' perform this check
+readRaw :: forall chip a . (Chip chip, Storable a) => BusDevice chip -> IO a
+readRaw busdev@(BusDevice _id ptr) = do
+    let len = sizeOf @a undefined
+    --  according to doc of `allocaBytes`, the call to `allocaArray` should free memory if exception
+    allocaArray (fromIntegral len) $ \arr -> do
+        len' <- assertOK (tagErr busdev) $ fmap fromIntegral $ fdReadBuf (ptrI2C_ClientToFd ptr) arr (fromIntegral len)
+        when (len' /= len) $ throwIO $ errI2C eIO $ "read " <> show len' <> " bytes, expected " <> show len
+        (try @IOException $ peek (castPtr arr )) >>= \case
+            Right a -> pure a
+            Left  err -> throwIO $ fromIOException err
+    where
+      tagErr busdev = "readRaw " <> show busdev 
+
+writeRaw :: forall chip a . (Chip chip, Storable a) => BusDevice chip -> a -> IO ()
+writeRaw busdev@(BusDevice _id ptr) = \a -> do
+    let len = sizeOf a
+    --  according to doc of `allocaBytes`, the call to `allocaArray` should free memory if exception
+    allocaArray (fromIntegral len) $ \arr -> do
+
+        (try @IOException $ poke (castPtr arr) a) >>= \case
+            Right _ -> pure ()
+            Left err -> throwIO $ fromIOException err
+        
+        len' <- assertOK (tagErr busdev) $ fmap fromIntegral $ fdWriteBuf (ptrI2C_ClientToFd ptr) arr (fromIntegral len)
+        when (len' /= len) $ throwIO $ errI2C eIO $ "wrote " <> show len' <> " bytes, expected " <> show len
+    where
+      tagErr busdev = "writeRaw " <> show busdev 
+
 
 --------------------------------------------------------------------------------
 --  FFI
@@ -208,7 +235,7 @@ assertOK str ma = do
     if res < 0 then throwIO $ errI2C (Errno $ negate res) str
                else pure $ fromIntegral res
                   
-
+-- | int ioctl(int d, int request, ...)
 foreign import ccall safe "sys/ioctl.h ioctl" c_ioctl
     :: CInt -> CULong -> CInt -> IO CInt
 
