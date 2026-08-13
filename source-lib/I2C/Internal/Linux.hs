@@ -26,6 +26,9 @@ module I2C.Internal.Linux
     openChip,
     closeChip,
 
+    readRaw,
+    writeRaw,
+
     readData0,
     readData1,
     readData2,
@@ -34,10 +37,6 @@ module I2C.Internal.Linux
     writeData1,
     writeData2,
     --writeDataN,
-
-    readRaw,
-    writeRaw,
-    
 
 ) where
 
@@ -141,7 +140,7 @@ writeData1 busdev@(BusDevice _id ptr) regaddr = \w -> do
 
 
 --------------------------------------------------------------------------------
---  read/write 2 byte at register (smbus-word)
+--  read/write 2 bytes at register (smbus-word)
 
 readData2 :: forall chip . (Chip chip) => BusDevice chip -> RegisterAddress -> IO Word16
 readData2 busdev@(BusDevice _id ptr) regaddr = do

@@ -18,7 +18,6 @@
 -- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 -- SOFTWARE.
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE CPP #-}
 module I2C.TH
 (
   chip,
@@ -41,7 +40,7 @@ import Language.Haskell.TH.Lib
 --------------------------------------------------------------------------------
 --  Template Haskell 
 
--- | declare a Chip type 'name' at _7_ bit bus address 'reg'
+-- | declare a Chip type 'name at _7_ bit bus address 'reg
 --
 -- > $(chip "Chip123" 0x22) -- =>
 -- >   
@@ -102,9 +101,9 @@ register1 name addr def = do
       decInstanceRegister tname addr = do
           let dAddress = funD 'registerAddress $ one $ clause [] (normalB $ litE $ integerL $ fromRegisterAddress addr) []
               dName = funD 'registerName $ one $ clause [] (normalB $ litE $ stringL $ nameBase tname ) []
-              dRead = decFunctionAlias 'regread 'regread1'
-              dWrite = decFunctionAlias 'regwrite 'regwrite1'
-              dModify = decFunctionAlias 'regmodify 'regmodify1'
+              dRead = decFunctionAlias 'regread 'regread1
+              dWrite = decFunctionAlias 'regwrite 'regwrite1
+              dModify = decFunctionAlias 'regmodify 'regmodify1
           instanceD (cxt []) (appT (conT ''Register) (conT tname)) [dAddress, dName, dRead, dWrite, dModify]
 
       decInstanceShow :: Name -> Q Dec
@@ -142,9 +141,9 @@ register2 name addr def = do
       decInstanceRegister tname addr = do
           let dAddress = funD 'registerAddress $ one $ clause [] (normalB $ litE $ integerL $ fromRegisterAddress addr) []
               dName = funD 'registerName $ one $ clause [] (normalB $ litE $ stringL $ nameBase tname ) []
-              dRead = decFunctionAlias 'regread 'regread2'
-              dWrite = decFunctionAlias 'regwrite 'regwrite2'
-              dModify = decFunctionAlias 'regmodify 'regmodify2'
+              dRead = decFunctionAlias 'regread 'regread2
+              dWrite = decFunctionAlias 'regwrite 'regwrite2
+              dModify = decFunctionAlias 'regmodify 'regmodify2
           instanceD (cxt []) (appT (conT ''Register) (conT tname)) [dAddress, dName, dRead, dWrite, dModify]
     
       decInstanceShow :: Name -> Q Dec

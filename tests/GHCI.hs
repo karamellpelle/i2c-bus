@@ -14,6 +14,7 @@ import Numeric
 import Data.Bits
 import Data.Char (toUpper)
 import Text.Pretty.Simple
+import Control.Concurrent
 
 -- # load ghci with linux build:
 --    $ stack ghci --package=pretty-simple  --flag=i2c:-build-empty --flag=i2c:build-linux
@@ -55,6 +56,8 @@ main = do
 #ifdef I2C_INTERNAL_LINUX
     busdev <- openChip @PCF8575 "/dev/i2c-1"
     
-    rawwrite @PCF8575 @Word16 busdev 0xf731
+    forM_ [0..0x00FF] $ \ix -> do
+        rawwrite @PCF8575 @Word16 busdev ix
+        threadDelay 400000
 #endif
 
