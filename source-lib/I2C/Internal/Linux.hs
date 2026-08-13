@@ -43,7 +43,7 @@ module I2C.Internal.Linux
 
 import Relude
 import Relude.Extra.Newtype
-import I2C.Class
+import I2C.Chip
 import I2C.Exception
 import System.Posix.IO
 import System.Posix.Types

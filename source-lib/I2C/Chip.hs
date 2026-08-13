@@ -18,8 +18,7 @@
 -- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 -- SOFTWARE.
 {-# LANGUAGE AllowAmbiguousTypes #-}
-{-# LANGUAGE FunctionalDependencies #-}
-module I2C.Class
+module I2C.Chip
 (
     ChipAddress (..),
     RegisterAddress (..),
@@ -27,8 +26,6 @@ module I2C.Class
     fromRegisterAddress,
 
     Chip (..),
-    Register1 (..),
-    Register2 (..),
 
 ) where
 
@@ -76,22 +73,6 @@ fromRegisterAddress :: Num b => RegisterAddress -> b
 fromRegisterAddress (RegisterAddress addr) = fromIntegral addr
 
 
--- | typeclass for a chip's register containing 1 Word8.
-class Register1 reg where
-    -- | register index inside Chip
-    register1Address :: RegisterAddress
-    -- | human readable name
-    register1Name :: Text
-    register1Name = show $ register1Address @reg
-  
--- | typeclass for a chip's register containing 1 Word16.
-class Register2 reg where
-    -- | register index inside Chip
-    register2Address :: RegisterAddress
-    -- | human readable name
-    register2Name :: Text
-    register2Name = show $ register2Address @reg
-  
 
 --------------------------------------------------------------------------------
 --  

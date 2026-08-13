@@ -6,6 +6,7 @@ module GHCI where
 import Relude hiding (modify, modify')
 import Relude.Extra.Newtype
 import I2C
+import I2C.TH
 import Data.Default
 import Text.Show qualified
 import Numeric
@@ -28,13 +29,26 @@ $(chip "Chip123" 0xDE)
 $(register1 "REG_WORD8"  0x10 0x0A)
 $(register2 "REG_WORD16" 0x20 0x0B0C)
 
+instance Register REG_WORD8 where
+    registerAddress = 0x10
+    registerName = "REG_WORD8"
+    regread = regread1'
+    regwrite = regwrite1'
+    regmodify = regmodify1'
+
+instance Register REG_WORD16 where
+    registerAddress = 0x10
+    registerName = "REG_WORD8"
+    regread = regread2'
+    regwrite = regwrite2'
+    regmodify = regmodify2'
 
 main :: IO ()
 main = do
     busdev <- openChip @Chip123 "/dev/null"
 
-    a <- regread1 busdev
-    b <- regread2 busdev
+    a <- regread busdev
+    b <- regread busdev
 
     pPrint $ "REG_WORD8:  " <> show (a :: REG_WORD8)
     pPrint $ "REG_WORD16: " <> show (b :: REG_WORD16)

@@ -41,7 +41,7 @@ module I2C.Internal.Empty
 
 import Relude
 import Relude.Extra.Newtype
-import I2C.Class
+import I2C.Chip
 import I2C.Exception
 import Numeric
 import Text.Show qualified
