@@ -24,6 +24,11 @@ module I2C.TH
   register1,
   register2,
 
+  -- TODO:
+  --registerN, -- register + length + Storable a (smbus block)
+  --registerRaw, -- register + Storable a (plain i2c)
+
+  bitstrToField,
 ) where
 
 import Relude hiding (Type)
@@ -38,9 +43,9 @@ import Language.Haskell.TH.Syntax
 import Language.Haskell.TH.Lib
 
 --------------------------------------------------------------------------------
---  Template Haskell 
+--  create Chip's and Registers' through Template Haskell 
 
--- | declare a Chip type 'name at _7_ bit bus address 'reg
+-- | declare a Chip with name 'name' at _7_ bit bus address 'addr'
 --
 -- > $(chip "Chip123" 0x22) -- =>
 -- >   
@@ -76,15 +81,16 @@ chip name addr = do
 -- > $(register1 "REG_SMALL" 0xF0 0x01) =>
 -- > 
 -- >   newtype REG_SMALL = REG_SMALL Word8
--- >       deriving (Show)
 -- >   instance Register REG_SMALL where
 -- >       registerAddress = 0xF0
 -- >       registerName = "REG_SMALL"
--- >       regread = regread1'
--- >       regwrite = regwrite1'
--- >       regmodify = regmodify1'
+-- >       regread = regreadRegister1
+-- >       regwrite = regwriteRegister1
+-- >       regmodify = regmodifyRegister1
 -- >   instance Default REG_SMALL where
 -- >       def = REG_SMALL 0x01
+-- >   instance Show REG_SMALL where
+-- >       show = showRegister1
 -- 
 register1 :: String -> RegisterAddress -> Word8 -> Q [Dec]
 register1 name addr def = do
@@ -101,9 +107,9 @@ register1 name addr def = do
       decInstanceRegister tname addr = do
           let dAddress = funD 'registerAddress $ one $ clause [] (normalB $ litE $ integerL $ fromRegisterAddress addr) []
               dName = funD 'registerName $ one $ clause [] (normalB $ litE $ stringL $ nameBase tname ) []
-              dRead = decFunctionAlias 'regread 'regread1
-              dWrite = decFunctionAlias 'regwrite 'regwrite1
-              dModify = decFunctionAlias 'regmodify 'regmodify1
+              dRead = decFunctionAlias 'regread 'regreadRegister1
+              dWrite = decFunctionAlias 'regwrite 'regwriteRegister1
+              dModify = decFunctionAlias 'regmodify 'regmodifyRegister1
           instanceD (cxt []) (appT (conT ''Register) (conT tname)) [dAddress, dName, dRead, dWrite, dModify]
 
       decInstanceShow :: Name -> Q Dec
@@ -125,6 +131,8 @@ register1 name addr def = do
 -- >       regwrite = regwrite2'
 -- >   instance Default REG_LARGE where
 -- >       def = 0x0123
+-- >   instance Show REG_LARGE where
+-- >       show = showRegister2
 -- 
 register2 :: String -> RegisterAddress -> Word16 -> Q [Dec]
 register2 name addr def = do
@@ -141,17 +149,36 @@ register2 name addr def = do
       decInstanceRegister tname addr = do
           let dAddress = funD 'registerAddress $ one $ clause [] (normalB $ litE $ integerL $ fromRegisterAddress addr) []
               dName = funD 'registerName $ one $ clause [] (normalB $ litE $ stringL $ nameBase tname ) []
-              dRead = decFunctionAlias 'regread 'regread2
-              dWrite = decFunctionAlias 'regwrite 'regwrite2
-              dModify = decFunctionAlias 'regmodify 'regmodify2
+              dRead = decFunctionAlias 'regread 'regreadRegister2
+              dWrite = decFunctionAlias 'regwrite 'regwriteRegister2
+              dModify = decFunctionAlias 'regmodify 'regmodifyRegister2
           instanceD (cxt []) (appT (conT ''Register) (conT tname)) [dAddress, dName, dRead, dWrite, dModify]
     
       decInstanceShow :: Name -> Q Dec
       decInstanceShow tname =
           instanceD (cxt []) (appT (conT ''Show) (conT tname)) $ one $ decFunctionAlias 'Text.Show.show 'showRegister2
 
+{-
+field :: Name -> String -> String -> Q [Dec]
+field rname fieldname bitstr = case bitstrToField bitstr of
+    Left err              -> fail err
+    Right (size, ix, len) -> do
+        let fname = mkName fieldname
+        dGet <- decGet rname fname size ix len
+        dSet <- decSet rname fname size ix len
+        dBit <- if len == 1 then decBit rname fname size ix else mempty
+        pure $ dGet <> dSet <> dBit
+    where
+        dGet rname fname size ix len = pure []
+        dSet rname fname size ix len = pure []
+        dBit rname fname size ix = pure []
 
-
+getXTAL_DIV :: CTRL -> Word8
+getXTAL_DIV (CTRL a) = 
+    (unsafeShiftR a ix) .&. (unsafeShiftR )
+    where
+      len 
+-}
 {-
 FIXME: create TH functions for the following constructs
 
@@ -174,21 +201,6 @@ $(field   ''SYSTEM1 "TX_ENABLE" "000*0000") =>
   getbitTX_ENABLE    :: TX_ENABLE -> Bool
 
 
--- | bitstring to begin index and field length
-bitsToField Word8 -> (Word8, Word8) 
-bitsToField bitstr = strip 0 bitstr
-    where
-        strip ix as = case as of
-            ('*':as') -> count ix 0 as
-            (_:as')   -> strip (succ ix) as'
-            []        -> rest ix as -- FIXME
-        count ix len as = case as of
-            ('*':as') -> count ix (succ len) as' -- TODO: assert ix + len <= 8
-            _         -> rest ix len (ix + len) as'
-        rest ix len total as -> case as of
-            []        -> -- TODO: assert total <= 8, return
-            ('*':_)   -> fail "field is not connected"
-            (_:as')   -> rest ix len (succ total) as'
 -}
 
 --------------------------------------------------------------------------------
@@ -229,6 +241,26 @@ showRegister2 reg =
     (toString $ registerName @reg) <> "(" <> showWord16 (coerce reg) <> ")"
     --(toString $ registerName @reg) <> "==" <> showWord16 (coerce reg) 
 
+
+-- | bitstring to (size, index, length). bitstring read as big endian since that 
+--   is how bits and bytes are written programmatically
+--   example: "0000***0" -> Right (8, 1, 3)
+bitstrToField :: String -> Either String (Word8, Word8, Word8) 
+bitstrToField bitstr = 
+    strip 0 $ reverse bitstr
+    where
+      strip ix as = case as of
+          ('*':as') -> count ix 0 as
+          (_:as')   -> strip (succ ix) as'
+          []        -> rest ix ix ix []
+      count ix len as = case as of
+          ('*':as') -> count ix (succ len) as' 
+          (_:as')   -> rest ix len (ix + len) as
+          []        -> rest ix len (ix + len) []
+      rest ix len total as = case as of
+          ('*':_)   -> Left $ "field is disconnected: " <> bitstr
+          (_:as')   -> rest ix len (succ total) as'
+          []        -> Right (total, ix, len)
 --------------------------------------------------------------------------------
 --  
 

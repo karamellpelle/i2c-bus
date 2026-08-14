@@ -28,14 +28,17 @@ module I2C.Internal.Linux
 
     readRaw,
     writeRaw,
+    readRegRaw,
+    writeRegRaw,
 
-    readData0,
+
     readData1,
-    readData2,
+    readRegData1,
+    readRegData2,
     --readDataN,
-    writeData0,
     writeData1,
-    writeData2,
+    writeRegData1,
+    writeRegData2,
     --writeDataN,
 
 ) where
@@ -106,78 +109,8 @@ ptrI2C_ClientToFd =
 
 
 --------------------------------------------------------------------------------
--- read/write without register (smbus-command)
-
-readData0 :: forall chip . (Chip chip) => BusDevice chip -> IO Word8
-readData0 busdev@(BusDevice _id ptr) = do
-    assertOK (tagErr busdev) $ c_readByte ptr 
-    where
-      tagErr busdev = "readData0 " <> show busdev
-
-writeData0 :: forall chip . (Chip chip) => BusDevice chip -> Word8 -> IO ()
-writeData0 busdev@(BusDevice _id ptr) = \w -> do
-    _ <- assertOK (tagErr busdev w) $ c_writeByte ptr (fromIntegral w)
-    pure ()
-    where
-      tagErr busdev w = "writeData0 " <> show busdev <> " := " <> show w
-
-
---------------------------------------------------------------------------------
---  read/write 1 byte at register (smbus-byte)
- 
-readData1 :: forall chip . (Chip chip) => BusDevice chip -> RegisterAddress -> IO Word8
-readData1 busdev@(BusDevice _id ptr) regaddr = do
-    assertOK (tagErr busdev regaddr) $ c_readByteData ptr (fromRegisterAddress regaddr)
-    where
-      tagErr busdev regaddr = "readData1 " <> show busdev <> " " <> show regaddr 
-
-writeData1 :: forall chip . (Chip chip) => BusDevice chip -> RegisterAddress -> Word8 -> IO ()
-writeData1 busdev@(BusDevice _id ptr) regaddr = \w -> do
-    _ <- assertOK (tagErr busdev regaddr w) $ c_writeByteData ptr (fromRegisterAddress regaddr) (fromIntegral w)
-    pure ()
-    where
-      tagErr busdev regaddr w = "writeData1 " <> show busdev <> " " <> show regaddr <> " := " <> show w
-
-
---------------------------------------------------------------------------------
---  read/write 2 bytes at register (smbus-word)
-
-readData2 :: forall chip . (Chip chip) => BusDevice chip -> RegisterAddress -> IO Word16
-readData2 busdev@(BusDevice _id ptr) regaddr = do
-    assertOK (tagErr busdev regaddr) $ c_readWordData ptr (fromRegisterAddress regaddr)
-    where
-      tagErr busdev regaddr = "readData2 " <> show busdev <> " " <> show regaddr 
-
-writeData2 :: forall chip . (Chip chip) => BusDevice chip -> RegisterAddress -> Word16 -> IO ()
-writeData2 busdev@(BusDevice _id ptr) regaddr = \w -> do
-    _ <- assertOK (tagErr busdev regaddr w) $ c_writeWordData ptr (fromRegisterAddress regaddr) (fromIntegral w)
-    pure ()
-    where
-      tagErr busdev regaddr w = "writeData2 " <> show busdev <> " " <> show regaddr <> " := " <> show w
-
-
-
---------------------------------------------------------------------------------
 --  raw I2C read/write, no registers (SMBus free)
---
---  from https://www.kernel.org/doc/html/latest/i2c/dev-interface.html :
--- > /*
--- >  * Using I2C Write, equivalent of
--- >  * i2c_smbus_write_word_data(file, reg, 0x6543)
--- >  */
--- > buf[0] = reg;
--- > buf[1] = 0x43;
--- > buf[2] = 0x65;
--- > if (write(file, buf, 3) != 3) {
--- >   /* ERROR HANDLING: I2C transaction failed */
--- > }
--- > 
--- > /* Using I2C Read, equivalent of i2c_smbus_read_byte(file) */
--- > if (read(file, buf, 1) != 1) {
--- >   /* ERROR HANDLING: I2C transaction failed */
--- > } else {
--- >   /* buf[0] contains the read byte */
--- > }
+--  according to doc of `allocaBytes`, the call to `allocaArray` should free memory if exception
 
 -- |  read data in BusDevice
 --  FIXME: do we need some alignment restrictions on 'a'? cf. docs for `Storable.alignment|peek`
@@ -185,30 +118,116 @@ writeData2 busdev@(BusDevice _id ptr) regaddr = \w -> do
 readRaw :: forall chip a . (Chip chip, Storable a) => BusDevice chip -> IO a
 readRaw busdev@(BusDevice _id ptr) = do
     let len = sizeOf @a undefined
-    --  according to doc of `allocaBytes`, the call to `allocaArray` should free memory if exception
-    allocaArray (fromIntegral len) $ \arr -> do
-        len' <- assertOK (tagErr busdev) $ fmap fromIntegral $ fdReadBuf (ptrI2C_ClientToFd ptr) arr (fromIntegral len)
-        when (len' /= len) $ throwIO $ errI2C eIO $ "read " <> show len' <> " bytes, expected " <> show len
-        (try @IOException $ peek (castPtr arr )) >>= \case
-            Right a -> pure a
-            Left  err -> throwIO $ fromIOException err
+    res <- try @IOException $ allocaArray len $ \arr -> do
+        _ <- assertOK (tagErr busdev) $ c_read_raw ptr arr (fromIntegral len)
+        peek $ castPtr arr
+
+    case res of
+        Right a   -> pure a
+        Left err  -> throwIO $ fromIOException err
+
     where
-      tagErr busdev = "readRaw " <> show busdev 
+      tagErr busdev = "readRaw " <> show busdev
 
 writeRaw :: forall chip a . (Chip chip, Storable a) => BusDevice chip -> a -> IO ()
 writeRaw busdev@(BusDevice _id ptr) = \a -> do
     let len = sizeOf a
-    --  according to doc of `allocaBytes`, the call to `allocaArray` should free memory if exception
-    allocaArray (fromIntegral len) $ \arr -> do
+    res <- try @IOException $ allocaArray len $ \arr -> do
+        --  
+        poke (castPtr arr) a
+        _ <- assertOK (tagErr busdev) $ c_write_raw ptr arr (fromIntegral len)
+        pure ()
 
-        (try @IOException $ poke (castPtr arr) a) >>= \case
-            Right _ -> pure ()
-            Left err -> throwIO $ fromIOException err
-        
-        len' <- assertOK (tagErr busdev) $ fmap fromIntegral $ fdWriteBuf (ptrI2C_ClientToFd ptr) arr (fromIntegral len)
-        when (len' /= len) $ throwIO $ errI2C eIO $ "wrote " <> show len' <> " bytes, expected " <> show len
+    case res of
+        Right _   -> pure ()
+        Left err  -> throwIO $ fromIOException err
     where
-      tagErr busdev = "writeRaw " <> show busdev 
+      tagErr busdev = "writeRaw " <> show busdev
+
+
+readRegRaw :: forall chip a . (Chip chip, Storable a) => BusDevice chip -> RegisterAddress -> IO a
+readRegRaw busdev@(BusDevice _id ptr) raddr = do
+    let len = sizeOf @a undefined
+    res <- try @IOException $ allocaArray (len + 1) $ \arr -> do
+        
+        poke arr $ fromRegisterAddress raddr
+
+        _ <- assertOK (tagErr busdev) $ c_regread_raw ptr arr (fromIntegral len) -- note: not len + 1
+        peek $ castPtr arr
+       
+    case res of
+        Right a   -> pure a
+        Left  err -> throwIO $ fromIOException err
+    where
+      tagErr busdev = "readRegRaw " <> show busdev 
+
+writeRegRaw :: forall chip a . (Chip chip, Storable a) => BusDevice chip -> RegisterAddress -> a -> IO ()
+writeRegRaw busdev@(BusDevice _id ptr) raddr = \a -> do
+    let len = sizeOf a
+    res <- try @IOException $ allocaArray (len + 1) $ \arr -> do
+        
+        poke arr $ fromRegisterAddress raddr  -- address
+        poke (plusPtr arr 1) $ a              -- data
+
+        _ <- assertOK (tagErr busdev) $ c_regwrite_raw ptr arr (fromIntegral len) -- note: not len + 1
+        pure ()
+       
+    case res of
+        Right a   -> pure a
+        Left  err -> throwIO $ fromIOException err
+    where
+      tagErr busdev = "readRegRaw " <> show busdev 
+
+--------------------------------------------------------------------------------
+-- read/write without register (smbus-command)
+
+readData1 :: forall chip . (Chip chip) => BusDevice chip -> IO Word8
+readData1 busdev@(BusDevice _id ptr) = do
+    assertOK (tagErr busdev) $ c_readByte ptr 
+    where
+      tagErr busdev = "readData1 " <> show busdev
+
+writeData1 :: forall chip . (Chip chip) => BusDevice chip -> Word8 -> IO ()
+writeData1 busdev@(BusDevice _id ptr) = \w -> do
+    _ <- assertOK (tagErr busdev w) $ c_writeByte ptr (fromIntegral w)
+    pure ()
+    where
+      tagErr busdev w = "writeData1 " <> show busdev <> " := " <> show w
+
+
+--------------------------------------------------------------------------------
+--  read/write 1 byte at register (smbus-byte)
+ 
+readRegData1 :: forall chip . (Chip chip) => BusDevice chip -> RegisterAddress -> IO Word8
+readRegData1 busdev@(BusDevice _id ptr) regaddr = do
+    assertOK (tagErr busdev regaddr) $ c_readByteData ptr (fromRegisterAddress regaddr)
+    where
+      tagErr busdev regaddr = "readRegData1 " <> show busdev <> " " <> show regaddr 
+
+writeRegData1 :: forall chip . (Chip chip) => BusDevice chip -> RegisterAddress -> Word8 -> IO ()
+writeRegData1 busdev@(BusDevice _id ptr) regaddr = \w -> do
+    _ <- assertOK (tagErr busdev regaddr w) $ c_writeByteData ptr (fromRegisterAddress regaddr) (fromIntegral w)
+    pure ()
+    where
+      tagErr busdev regaddr w = "writeRegData1 " <> show busdev <> " " <> show regaddr <> " := " <> show w
+
+
+--------------------------------------------------------------------------------
+--  read/write 2 bytes at register (smbus-word)
+
+readRegData2 :: forall chip . (Chip chip) => BusDevice chip -> RegisterAddress -> IO Word16
+readRegData2 busdev@(BusDevice _id ptr) regaddr = do
+    assertOK (tagErr busdev regaddr) $ c_readWordData ptr (fromRegisterAddress regaddr)
+    where
+      tagErr busdev regaddr = "readRegData2 " <> show busdev <> " " <> show regaddr 
+
+writeRegData2 :: forall chip . (Chip chip) => BusDevice chip -> RegisterAddress -> Word16 -> IO ()
+writeRegData2 busdev@(BusDevice _id ptr) regaddr = \w -> do
+    _ <- assertOK (tagErr busdev regaddr w) $ c_writeWordData ptr (fromRegisterAddress regaddr) (fromIntegral w)
+    pure ()
+    where
+      tagErr busdev regaddr w = "writeRegData2 " <> show busdev <> " " <> show regaddr <> " := " <> show w
+
 
 
 --------------------------------------------------------------------------------
@@ -237,6 +256,19 @@ assertOK str ma = do
 -- | int ioctl(int d, int request, ...)
 foreign import ccall safe "sys/ioctl.h ioctl" c_ioctl
     :: CInt -> CULong -> CInt -> IO CInt
+
+
+foreign import ccall safe "foreign.h read_raw" c_read_raw
+    :: Ptr I2C_Client -> Ptr Word8 -> CSize -> IO CInt
+
+foreign import ccall safe "foreign.h write_raw" c_write_raw
+    :: Ptr I2C_Client -> Ptr Word8 -> CSize -> IO CInt
+
+foreign import ccall safe "foreign.h regread_raw" c_regread_raw
+    :: Ptr I2C_Client -> Ptr Word8 -> CSize -> IO CInt
+
+foreign import ccall safe "foreign.h regwrite_raw" c_regwrite_raw
+    :: Ptr I2C_Client -> Ptr Word8 -> CSize -> IO CInt
 
 
 -- |  s32 i2c_smbus_read_byte(const struct i2c_client *client)¶

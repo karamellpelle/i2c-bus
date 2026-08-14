@@ -36,6 +36,11 @@ $(register2 "REG_WORD16" 0x20 0x0B0C)
 -- https://www.ti.com/lit/ds/symlink/pcf8575.pdf
 $(chip "PCF8575" 0x20)
 
+
+--fieldSet :: (Bits a, Coercible a r) => (r -> a) 
+--fieldSet :: Num w => w -> r -> r
+--fieldSet 
+
 main :: IO ()
 main = do
 

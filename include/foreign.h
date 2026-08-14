@@ -1,3 +1,4 @@
+/*
 -- Copyright (c) 2026 karamellpelle@hotmail.com
 -- 
 -- Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -17,31 +18,19 @@
 -- LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 -- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 -- SOFTWARE.
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE AllowAmbiguousTypes #-}
-{-# LANGUAGE FunctionalDependencies #-}
---{-# LANGUAGE UndecidableInstances #-}
-module I2C
-(
-    
-    Chip (..),
-    Register (..),
+*/
 
-    BusDevice,
-    openChip,
-    closeChip,
+#ifndef _FOREIGN_H_
+#define _FOREIGN_H_
+#include <stddef.h>
+#include <stdint.h>
 
-    rawread,
-    rawwrite,
-    rawmodify,
+int read_raw(int fd, uint8_t* buf, size_t len);
 
-    regreadRaw,
-    regwriteRaw,
-    regmodifyRaw,
+int write_raw(int fd, const uint8_t* buf, size_t len);
 
-    
-    module I2C.TH,
-) where
+int regread_raw(int fd, uint8_t* buf, size_t len);
 
-import I2C.Internal
-import I2C.TH
+int regwrite_raw(int fd, uint8_t* buf, size_t len);
+
+#endif

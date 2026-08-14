@@ -1,6 +1,7 @@
 # TODO
-* rename `regreadX/regwriteX/regmodifyX` into `smbusxxxY`
+* go away from linux smbus functions and use more primitive i2c functions directly 
+  (I guess smbus functions are based on more primitive functions)
+* move read/write into `foreign.c` for efficiency?
 * Linux: set BusDevice options: timeout etc
 * Template Haskell functions
-* rename `readX -> smbusreadX`, `Internal.readDataX -> Internal.readSMBusX`
-* `HasCallStack` when throwing I2CErr? use `withFrozenCallStack`?
+* fix `HasCallStack` when throwing I2CErr. use `withFrozenCallStack`?

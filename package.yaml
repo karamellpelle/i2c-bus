@@ -92,6 +92,7 @@ library:
           - unix
         c-sources: 
           - cbits/smbus.c
+          - cbits/foreign.c
         include-dirs: 
           - include
         other-extensions:

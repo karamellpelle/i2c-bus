@@ -24,7 +24,7 @@ module I2C.Internal
 (
     module I2C.Chip,
 
-    BusDevice,
+    BusDevice (..),
     openChip,
     closeChip,
 
@@ -34,26 +34,29 @@ module I2C.Internal
     rawwrite,
     rawmodify,
 
-    smbusread0,
-    smbuswrite0,
-    smbusmodify0,
-    smbusread1,
-    smbuswrite1,
-    smbusmodify1,
-    smbusread2,
-    smbuswrite2,
-    smbusmodify2,
-
+    regreadRaw,
+    regwriteRaw,
+    regmodifyRaw,
+    regread0,
+    regwrite0,
+    regmodify0,
     regread1,
-    regread2,
     regwrite1,
-    regwrite2,
     regmodify1,
+    regread2,
+    regwrite2,
     regmodify2,
+
+    regreadRegister1,
+    regwriteRegister1,
+    regmodifyRegister1,
+    regreadRegister2,
+    regwriteRegister2,
+    regmodifyRegister2,
 
 ) where
 
-import Relude hiding (modify)
+import Relude 
 import Data.Default
 import Foreign
 
@@ -68,8 +71,8 @@ import I2C.Internal.Empty
 
 
 ----------------------------------------------------------------------------------
--- raw read and write to chip without registers (SMBus free). size determined by 
--- 'Storable a'
+-- raw read and write to chip without registers (SMBus free). 
+-- size determined by 'Storable a'
 
 rawread :: forall chip a m . (Chip chip, Storable a, MonadIO m) => BusDevice chip -> m a
 rawread busdev = liftIO $
@@ -86,6 +89,96 @@ rawmodify busdev = \f -> liftIO $ do
     rawwrite @chip busdev a'
     pure a'
 
+----------------------------------------------------------------------------------
+-- raw read and write to chip with registers (SMBus free). 
+-- size determined by 'Storable a'
+
+regreadRaw :: forall chip a m . (Chip chip, Storable a, MonadIO m) => BusDevice chip -> RegisterAddress -> m a
+regreadRaw busdev addr = liftIO $
+    readRegRaw @chip busdev addr 
+
+regwriteRaw :: forall chip a m . (Chip chip, Storable a, MonadIO m)  => BusDevice chip -> RegisterAddress -> a -> m ()
+regwriteRaw busdev addr = \a -> liftIO $
+    writeRegRaw @chip busdev addr a
+
+regmodifyRaw :: forall chip a m . (Chip chip, Storable a, MonadIO m)  => BusDevice chip -> RegisterAddress -> (a -> a) -> m a
+regmodifyRaw busdev addr = \f -> liftIO $ do
+    a <- regreadRaw @chip busdev addr
+    let a' = f a
+    regwriteRaw @chip busdev addr a'
+    pure a'
+
+
+
+--------------------------------------------------------------------------------
+--  Word8 (smbus "byte")
+
+---- | read single Word8 from chip (no register)
+regread0 :: forall chip m . (Chip chip, MonadIO m) => BusDevice chip -> m Word8
+regread0 busdev = liftIO $ 
+    readData1 busdev 
+
+-- | write single Word8 to chip (no register)
+regwrite0 :: forall chip m . (Chip chip, MonadIO m) => BusDevice chip -> Word8 -> m ()
+regwrite0 busdev = \w -> liftIO $ 
+    writeData1 busdev w
+
+-- | modify current single Word8 in chip (no register)
+regmodify0 :: forall chip m . (Chip chip, MonadIO m) => BusDevice chip -> (Word8 -> Word8) -> m Word8
+regmodify0 busdev = \f -> liftIO $ do
+    w <- regread0 @chip busdev
+    let w' = f w
+    regwrite0 @chip busdev $ f w'
+    pure w' 
+
+
+--------------------------------------------------------------------------------
+--  Word8 (register + smbus "byte")
+
+-- | read 1 raw byte from register at chip
+regread1 :: forall chip m . (Chip chip, MonadIO m) => BusDevice chip -> RegisterAddress -> m Word8
+regread1 busdev = \raddr -> liftIO $ 
+    readRegData1 busdev raddr
+         
+-- | write raw byte to register at chip. returns value written
+regwrite1 :: forall chip m . (Chip chip, MonadIO m) => BusDevice chip -> RegisterAddress -> Word8 -> m ()
+regwrite1 busdev = \addr w -> liftIO $ 
+    writeRegData1 busdev addr w 
+
+-- | modify current raw content of register
+regmodify1 :: forall chip m . (Chip chip, MonadIO m) => BusDevice chip -> RegisterAddress -> (Word8 -> Word8) -> m Word8
+regmodify1 busdev = \addr f -> liftIO $ do
+    w <- regread1 @chip busdev addr
+    let w' = f w
+    regwrite1 @chip busdev addr w'
+    pure w'
+    
+--------------------------------------------------------------------------------
+--  Word16 (register + smbus "word")
+
+-- | read 2 raw bytes from register
+regread2 :: forall chip m . (Chip chip, MonadIO m) => BusDevice chip -> RegisterAddress -> m Word16
+regread2 busdev = \addr -> liftIO $ 
+    readRegData2 busdev addr 
+
+-- | write 2 raw bytes to register. 
+regwrite2 :: forall chip m . (Chip chip, MonadIO m) => BusDevice chip -> RegisterAddress -> Word16 -> m ()
+regwrite2 busdev = \addr w -> liftIO $ 
+    writeRegData2 busdev addr w 
+
+-- | modify current content of register
+regmodify2 :: forall chip m . (Chip chip, MonadIO m) => BusDevice chip -> RegisterAddress -> (Word16 -> Word16) -> m Word16
+regmodify2 busdev = \addr f -> liftIO $ do
+    w <- regread2 @chip busdev addr
+    let w' = f w
+    regwrite2 busdev addr w'
+    pure w'
+
+--------------------------------------------------------------------------------
+--  TODO: smbusxxxN (register + smbus "block")
+--        1 byte length + n bytes data). according to spec, n is not allowed to 
+--        be 0 for some reason, https://smbus.org/specs/smbus20.pdf#%5B%7B%22num%22%3A222%2C%22gen%22%3A0%7D%2C%7B%22name%22%3A%22FitB%22%7D%5D
+
 
 --------------------------------------------------------------------------------
 --  class Register
@@ -101,122 +194,51 @@ class Register reg where
 
     -- | bus functions
     regread   :: (Chip chip, MonadIO m) => BusDevice chip -> m reg
-    regwrite  :: (Chip chip, MonadIO m, Default reg) => BusDevice chip -> (reg -> reg) -> m reg
+    regwrite  :: (Chip chip, Default reg, MonadIO m) => BusDevice chip -> (reg -> reg) -> m reg
     regmodify :: (Chip chip, MonadIO m) => BusDevice chip -> (reg -> reg) -> m reg
-
-
-
---------------------------------------------------------------------------------
---  Word8 (smbus "byte")
-
----- | read single Word8 from chip (no register)
-smbusread0 :: forall chip m . (Chip chip, MonadIO m) => BusDevice chip -> m Word8
-smbusread0 busdev = liftIO $ 
-    readData0 busdev 
-
--- | write single Word8 to chip (no register)
-smbuswrite0 :: forall chip m . (Chip chip, MonadIO m) => BusDevice chip -> Word8 -> m ()
-smbuswrite0 busdev = \w -> liftIO $ 
-    writeData0 busdev w
-
--- | modify current single Word8 in chip (no register)
-smbusmodify0 :: forall chip m . (Chip chip, MonadIO m) => BusDevice chip -> (Word8 -> Word8) -> m Word8
-smbusmodify0 busdev = \f -> liftIO $ do
-    w <- smbusread0 @chip busdev
-    let w' = f w
-    smbuswrite0 @chip busdev $ f w'
-    pure w' 
-
-
---------------------------------------------------------------------------------
---  Word8 (register + smbus "byte")
-
--- | read 1 raw byte from register at chip
-smbusread1 :: forall chip m . (Chip chip, MonadIO m) => BusDevice chip -> RegisterAddress -> m Word8
-smbusread1 busdev = \raddr -> liftIO $ 
-    readData1 busdev raddr
-         
--- | write raw byte to register at chip. returns value written
-smbuswrite1 :: forall chip m . (Chip chip, MonadIO m) => BusDevice chip -> RegisterAddress -> Word8 -> m ()
-smbuswrite1 busdev = \addr w -> liftIO $ 
-    writeData1 busdev addr w 
-
--- | modify current raw content of register
-smbusmodify1 :: forall chip m . (Chip chip, MonadIO m) => BusDevice chip -> RegisterAddress -> (Word8 -> Word8) -> m Word8
-smbusmodify1 busdev = \addr f -> liftIO $ do
-    w <- smbusread1 @chip busdev addr
-    let w' = f w
-    smbuswrite1 @chip busdev addr w'
-    pure w'
-    
---------------------------------------------------------------------------------
---  Word16 (register + smbus "word")
-
--- | read 2 raw bytes from register
-smbusread2 :: forall chip m . (Chip chip, MonadIO m) => BusDevice chip -> RegisterAddress -> m Word16
-smbusread2 busdev = \addr -> liftIO $ 
-    readData2 busdev addr 
-
--- | write 2 raw bytes to register. 
-smbuswrite2 :: forall chip m . (Chip chip, MonadIO m) => BusDevice chip -> RegisterAddress -> Word16 -> m ()
-smbuswrite2 busdev = \addr w -> liftIO $ 
-    writeData2 busdev addr w 
-
--- | modify current content of register
-smbusmodify2 :: forall chip m . (Chip chip, MonadIO m) => BusDevice chip -> RegisterAddress -> (Word16 -> Word16) -> m Word16
-smbusmodify2 busdev = \addr f -> liftIO $ do
-    w <- smbusread2 @chip busdev addr
-    let w' = f w
-    smbuswrite2 busdev addr w'
-    pure w'
-
---------------------------------------------------------------------------------
---  TODO: smbusxxxN (register + smbus "block")
---        1 byte length + n bytes data). according to spec, n is not allowed to 
---        be 0 for some reason, https://smbus.org/specs/smbus20.pdf#%5B%7B%22num%22%3A222%2C%22gen%22%3A0%7D%2C%7B%22name%22%3A%22FitB%22%7D%5D
 
 
 --------------------------------------------------------------------------------
 --  helpers intented for Register instancing
 
-regread1 :: forall chip reg m . (Chip chip, Register reg, Coercible Word8 reg, MonadIO m) => 
+regreadRegister1 :: forall chip reg m . (Chip chip, Register reg, Coercible Word8 reg, MonadIO m) => 
             BusDevice chip -> m reg
-regread1 busdev = 
-    fmap coerce $ smbusread1 @chip busdev (registerAddress @reg)
+regreadRegister1 busdev = 
+    fmap coerce $ regread1 @chip busdev (registerAddress @reg)
 
-regwrite1 :: forall chip reg m . (Chip chip, Register reg, Coercible Word8 reg, Default reg, MonadIO m) => 
+regwriteRegister1 :: forall chip reg m . (Chip chip, Register reg, Coercible Word8 reg, Default reg, MonadIO m) => 
             BusDevice chip -> (reg -> reg) -> m reg
-regwrite1 busdev = \f -> do
+regwriteRegister1 busdev = \f -> do
     let r' = f def
-    smbuswrite1 @chip busdev (registerAddress @reg) (coerce $ r')
+    regwrite1 @chip busdev (registerAddress @reg) (coerce $ r')
     pure r'
 
-regmodify1 :: forall chip reg m . (Chip chip, Register reg, Coercible Word8 reg, MonadIO m) => 
+regmodifyRegister1 :: forall chip reg m . (Chip chip, Register reg, Coercible Word8 reg, MonadIO m) => 
             BusDevice chip -> (reg -> reg) -> m reg
-regmodify1 busdev = \f -> do
-    r <- regread1 busdev
+regmodifyRegister1 busdev = \f -> do
+    r <- regreadRegister1 busdev
     let r' = f r
-    smbuswrite1 busdev (registerAddress @reg) $ coerce $ r'
+    regwrite1 busdev (registerAddress @reg) $ coerce $ r'
     pure r'
 
      
-regread2 :: forall chip reg m . (Chip chip, Register reg, Coercible Word16 reg, MonadIO m) => 
+regreadRegister2 :: forall chip reg m . (Chip chip, Register reg, Coercible Word16 reg, MonadIO m) => 
             BusDevice chip -> m reg
-regread2 busdev =
-    fmap coerce $ smbusread2 @chip busdev (registerAddress @reg)
+regreadRegister2 busdev =
+    fmap coerce $ regread2 @chip busdev (registerAddress @reg)
 
-regwrite2 :: forall chip reg m . (Chip chip, Register reg, Coercible Word16 reg, Default reg, MonadIO m) => 
+regwriteRegister2 :: forall chip reg m . (Chip chip, Register reg, Coercible Word16 reg, Default reg, MonadIO m) => 
             BusDevice chip -> (reg -> reg) -> m reg
-regwrite2 busdev = \f -> do
+regwriteRegister2 busdev = \f -> do
     let r' = f def
-    smbuswrite2 @chip busdev (registerAddress @reg) $ coerce $ r'
+    regwrite2 @chip busdev (registerAddress @reg) $ coerce $ r'
     pure r'
 
-regmodify2 :: forall chip reg m . (Chip chip, Register reg, Coercible Word16 reg, MonadIO m) => 
+regmodifyRegister2 :: forall chip reg m . (Chip chip, Register reg, Coercible Word16 reg, MonadIO m) => 
             BusDevice chip -> (reg -> reg) -> m reg
-regmodify2 busdev = \f -> do
-    r <- regread2 busdev
+regmodifyRegister2 busdev = \f -> do
+    r <- regreadRegister2 busdev
     let r' = f r
-    smbuswrite2 busdev (registerAddress @reg) $ coerce $ r'
+    regwrite2 busdev (registerAddress @reg) $ coerce $ r'
     pure r'
 
