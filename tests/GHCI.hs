@@ -19,6 +19,11 @@ import Text.Pretty.Simple
 import Text.Printf
 import Control.Concurrent
 
+import Language.Haskell.TH
+import Language.Haskell.TH.Syntax
+import Language.Haskell.TH.Lib
+
+
 --
 -- * load ghci with linux build:
 --    $ stack ghci --package=pretty-simple  --flag=i2c:-build-empty --flag=i2c:build-linux
@@ -31,6 +36,57 @@ import Control.Concurrent
 -- if you get link errors, run `stack test` which will build the FFI parts,
 -- and those symbols will then be available in GHCi
 
+--------------------------------------------------------------------------------
+--  TH helpers
+--printQ :: Quasi m => Q a -> m ()
+--printQ ma = pPrint =<< runQ ma
+
+
+$(register2 "TEMP" 0x41 0x0000)
+
+getXTAL_DIV :: (Integral w, Bits w) => TEMP -> w
+getXTAL_DIV = \(TEMP w) -> fromIntegral $ (shiftR w 3) .&. 0b11
+
+setXTAL_DIV :: (Integral w, Bits w) => w -> TEMP -> TEMP
+setXTAL_DIV = \w1 (TEMP w0) -> TEMP $ (w0 .&. complement 0b00011000) .|. shiftL (0b11 .&. fromIntegral w1) 3
+
+getXTAL_EN :: (Integral w, Bits w) => TEMP -> w
+getXTAL_EN = \(TEMP w) -> fromIntegral $ (shiftR w 6) .&. 0b1
+
+setXTAL_EN :: (Integral w, Bits w) => w -> TEMP -> TEMP
+setXTAL_EN = \w1 (TEMP w0) -> TEMP $ (w0 .&. complement 0b01000000) .|. shiftL (0b1 .&. fromIntegral w1) 6
+
+modifyXTAL_EN :: (Integral w, Bits w) => (w -> w) -> TEMP -> TEMP
+modifyXTAL_EN f = \t -> setXTAL_EN (f $ getXTAL_EN t) t
+
+bitsetXTAL_EN :: TEMP -> TEMP
+bitsetXTAL_EN = \(TEMP w) -> TEMP $ setBit w 6
+
+bitclearXTAL_EN :: TEMP -> TEMP
+bitclearXTAL_EN = \(TEMP w) -> TEMP $ clearBit w 6
+
+bittoggleXTAL_EN :: TEMP -> TEMP
+bittoggleXTAL_EN = \(TEMP w) -> TEMP $ complementBit w 6
+
+print16 :: Coercible Word16 a => a -> IO ()
+print16 a = putTextLn $ toText @String $ printf "%016b" $ un @Word16 a
+
+print8 :: Coercible Word8 a => a -> IO ()
+print8 a = putTextLn $ toText @String $ printf "%08b" $ un @Word8 a
+
+printTEMP :: TEMP -> IO ()
+printTEMP (TEMP w) = putTextLn $ toText @String $ printf "%08b" $ w
+
+t :: TEMP
+t = TEMP 0b01010100
+
+$(register2 "MY_REG" 0x22 0xffdd)
+
+$(field ''MY_REG "MY_FIELD" "00000000000****0")
+
+testExp :: Word -> Q Exp
+testExp n =
+    [e| pPrint n|]
 
 --------------------------------------------------------------------------------
 --  dummy
@@ -55,7 +111,7 @@ testDummy = do
     pPrint $ "Default REG_WORD16: " <> show (def :: REG_WORD16)
 -}
 
-
+{-
 --------------------------------------------------------------------------------
 --  PCF8575
 
@@ -74,6 +130,7 @@ testPCF8575 = do
 
 $(register1 "CTRL" 0x01 0xa0)
 $(register2 "XTAL" 0x02 0x01)
+-}
 
 --------------------------------------------------------------------------------
 --  MPU6050

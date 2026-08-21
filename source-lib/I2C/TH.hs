@@ -24,6 +24,8 @@ module I2C.TH
   register1,
   register2,
 
+  field,
+
 ) where
 
 import Relude hiding (Type)
@@ -32,6 +34,7 @@ import Foreign
 import Numeric
 import Text.Show qualified
 import Data.Char (toUpper)
+import Data.Bits
 
 import I2C.Types
 import I2C.Chip
@@ -166,6 +169,76 @@ register2 name addr def = do
       decInstanceShow tname =
           instanceD (cxt []) (appT (conT ''Show) (conT tname)) $ one $ decFunctionAlias 'Text.Show.show 'showRegister2
 
+
+-- | declare register utils
+
+{-
+FIXME: create TH functions for the following constructs
+
+
+$(field   ''SYSTEM1 "XTAL_DIV" "0***0000") =>
+
+  -- setter and getter. field size 3 at bit index 5
+  setXTAL_DIV :: Word8 -> SYSTEM1 -> SYSTEM1
+  getXTAL_DIV :: SYSTEM1 -> Word8
+
+$(field   ''SYSTEM1 "TX_ENABLE" "000*0000") =>
+    
+  -- setter and getter
+  setTX_ENABLE :: Word8 -> TX_ENABLE -> TX_ENABLE
+  getTX_ENABLE :: TX_ENABLE -> Word8
+  -- bit utils, since field has size only 1 
+  setbitTX_ENABLE    :: TX_ENABLE -> TX_ENABLE
+  clearbitTX_ENABLE  :: TX_ENABLE -> TX_ENABLE
+  togglebitTX_ENABLE :: TX_ENABLE -> TX_ENABLE
+  getbitTX_ENABLE    :: TX_ENABLE -> Bool
+
+
+-}
+field :: Name -> String -> String -> Q [Dec]
+field ty name bitstr = case bitstrToField bitstr of
+    Left err              -> fail err
+    Right sil@(size, ix, len) -> do
+        tycon <- nameTyCon ty
+        dGet <- decGet ty tycon sil
+        dSet <- decSet ty sil
+        dBit <- if len == 1 then decBit ty sil else mempty
+        pure $ dGet <> dSet <> dBit
+    where
+        nameTyCon :: Name -> Q Name
+        nameTyCon ty = do
+            TyConI (NewtypeD _ _ty _ _ (NormalC tycon [(_, ConT _tywrapped)]) _)  <- reify ty
+            pure tycon
+
+        -- ix == 3, len == 2 =>
+        -- > getX :: (Integral w, Bits w) => REG -> w
+        -- > getX = \(REG w) -> fromIntegral $ (shiftR w 3) .&. 0b11
+        decGet ty tycon (size, ix, len) = do
+            let funname = mkFunctionName $ "get" <> name  
+                mask = mkMaskN len 
+                ----mask = mkMask size ix len :: LitE
+                --mask = (LitE (IntegerL 3))
+            w0 <- newName "w" 
+            w1 <- newName "w"
+            pure  [ SigD funname (ForallT [] [AppT (ConT ''Integral) (VarT w1), AppT (ConT ''Bits) (VarT w1)] (AppT (AppT ArrowT (ConT ty)) (VarT w1)))
+                  , ValD (VarP funname) (NormalB (LamE [ConP tycon [] [VarP w0]] 
+                         (InfixE (Just (VarE 'fromIntegral)) (VarE '($)) (Just (InfixE (Just (AppE (AppE (VarE 'unsafeShiftR) (VarE w0)) (LitE (IntegerL $ fromIntegral ix)))) (VarE '(.&.)) (Just mask)))))) []
+                  ]
+                  --, ValD (VarP funname) (NormalB (LamE [ConP cname [] [VarP w1]] 
+                  --       (InfixE (Just (VarE 'fromIntegral)) (VarE '($)) (Just (InfixE (Just (AppE (AppE (VarE 'unsafeshiftR) (VarE w1)) (LitE (IntegerL $ fromIntegral ix)))) (VarE '(.&.)) (Just mask)))))) []
+
+        decSet ty (size, ix, len) = pure []
+        decBit ty (size, ix, len) = pure []
+
+-- | 3 => 0b0111
+mkMaskN :: Word -> Exp
+mkMaskN n = 
+    LitE $ IntegerL $ shiftL 0b1 (fromIntegral n) - 1
+
+mkFunctionName :: String -> Name
+mkFunctionName str = 
+    Name (OccName str) NameS
+
 --------------------------------------------------------------------------------
 --  helpers for Register instancing
 
@@ -211,50 +284,6 @@ regmodifyRegister2 busdev = \f -> do
     pure r'
 
 
-{-
-field :: Name -> String -> String -> Q [Dec]
-field rname fieldname bitstr = case bitstrToField bitstr of
-    Left err              -> fail err
-    Right (size, ix, len) -> do
-        let fname = mkName fieldname
-        dGet <- decGet rname fname size ix len
-        dSet <- decSet rname fname size ix len
-        dBit <- if len == 1 then decBit rname fname size ix else mempty
-        pure $ dGet <> dSet <> dBit
-    where
-        dGet rname fname size ix len = pure []
-        dSet rname fname size ix len = pure []
-        dBit rname fname size ix = pure []
-
-getXTAL_DIV :: CTRL -> Word8
-getXTAL_DIV (CTRL a) = 
-    (unsafeShiftR a ix) .&. (unsafeShiftR )
-    where
-      len 
--}
-{-
-FIXME: create TH functions for the following constructs
-
-
-$(field   ''SYSTEM1 "XTAL_DIV" "0***0000") =>
-
-  -- setter and getter. field size 3 at bit index 5
-  setXTAL_DIV :: Word8 -> SYSTEM1 -> SYSTEM1
-  getXTAL_DIV :: SYSTEM1 -> Word8
-
-$(field   ''SYSTEM1 "TX_ENABLE" "000*0000") =>
-    
-  -- setter and getter
-  setTX_ENABLE :: Word8 -> TX_ENABLE -> TX_ENABLE
-  getTX_ENABLE :: TX_ENABLE -> Word8
-  -- bit utils, since field has size only 1 
-  setbitTX_ENABLE    :: TX_ENABLE -> TX_ENABLE
-  clearbitTX_ENABLE  :: TX_ENABLE -> TX_ENABLE
-  togglebitTX_ENABLE :: TX_ENABLE -> TX_ENABLE
-  getbitTX_ENABLE    :: TX_ENABLE -> Bool
-
-
--}
 
 --------------------------------------------------------------------------------
 --  helpers
@@ -298,7 +327,7 @@ showRegister2 reg =
 -- | bitstring to (size, index, length). bitstring read as big endian since that 
 --   is how bits and bytes are written programmatically
 --   example: "0000***0" -> Right (8, 1, 3)
-bitstrToField :: String -> Either String (Word8, Word8, Word8) 
+bitstrToField :: String -> Either String (Word, Word, Word) 
 bitstrToField bitstr = 
     strip 0 $ reverse bitstr
     where
