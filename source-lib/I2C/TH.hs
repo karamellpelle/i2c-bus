@@ -170,38 +170,22 @@ register2 name addr def = do
           instanceD (cxt []) (appT (conT ''Show) (conT tname)) $ one $ decFunctionAlias 'Text.Show.show 'showRegister2
 
 
--- | declare register utils
+-- | declare a (sub)field of a register 
 
-{-
-FIXME: create TH functions for the following constructs
-
-
-$(field   ''SYSTEM1 "XTAL_DIV" "0***0000") =>
-
-  -- setter and getter. field size 3 at bit index 5
-  setXTAL_DIV :: Word8 -> SYSTEM1 -> SYSTEM1
-  getXTAL_DIV :: SYSTEM1 -> Word8
-
-$(field   ''SYSTEM1 "TX_ENABLE" "000*0000") =>
-    
-  -- setter and getter
-  setTX_ENABLE :: Word8 -> TX_ENABLE -> TX_ENABLE
-  getTX_ENABLE :: TX_ENABLE -> Word8
-  -- bit utils, since field has size only 1 
-  setbitTX_ENABLE    :: TX_ENABLE -> TX_ENABLE
-  clearbitTX_ENABLE  :: TX_ENABLE -> TX_ENABLE
-  togglebitTX_ENABLE :: TX_ENABLE -> TX_ENABLE
-  getbitTX_ENABLE    :: TX_ENABLE -> Bool
-
-
--}
+ --
+ --   field ''MY_REG "MY_FIELD" "00000000000****0"
+ -- ======>
+ --   getMY_FIELD :: (Integral w1, Bits w1) => MY_REG -> w1
+ --   getMY_FIELD = \(MY_REG w0) -> fromIntegral $ (unsafeShiftR w0 1 .&. 0b0000000000001111)
+ --   setMY_FIELD :: (Integral w, Bits w) => w -> MY_REG -> MY_REG
+ --   setMY_FIELD = \w1 (MY_REG w0) -> MY_REG $ ((w0 .&. complement 0b0000000000011110) .|. unsafeShiftL (0b0000000000001111 .&. fromIntegral w1) 1)
 field :: Name -> String -> String -> Q [Dec]
 field ty name bitstr = case bitstrToField bitstr of
     Left err              -> fail err
     Right sil@(size, ix, len) -> do
         tycon <- nameTyCon ty
         dGet <- decGet ty tycon sil
-        dSet <- decSet ty sil
+        dSet <- decSet ty tycon sil
         dBit <- if len == 1 then decBit ty sil else mempty
         pure $ dGet <> dSet <> dBit
     where
@@ -215,25 +199,35 @@ field ty name bitstr = case bitstrToField bitstr of
         -- > getX = \(REG w) -> fromIntegral $ (shiftR w 3) .&. 0b11
         decGet ty tycon (size, ix, len) = do
             let funname = mkFunctionName $ "get" <> name  
-                mask = mkMaskN len 
-                ----mask = mkMask size ix len :: LitE
-                --mask = (LitE (IntegerL 3))
-            w0 <- newName "w" 
-            w1 <- newName "w"
+                maskE = LitE $ IntegerL $ mkMaskN len 
+            w0 <- newName "w0" 
+            w1 <- newName "w1"
             pure  [ SigD funname (ForallT [] [AppT (ConT ''Integral) (VarT w1), AppT (ConT ''Bits) (VarT w1)] (AppT (AppT ArrowT (ConT ty)) (VarT w1)))
                   , ValD (VarP funname) (NormalB (LamE [ConP tycon [] [VarP w0]] 
-                         (InfixE (Just (VarE 'fromIntegral)) (VarE '($)) (Just (InfixE (Just (AppE (AppE (VarE 'unsafeShiftR) (VarE w0)) (LitE (IntegerL $ fromIntegral ix)))) (VarE '(.&.)) (Just mask)))))) []
+                         (InfixE (Just (VarE 'fromIntegral)) (VarE '($)) (Just (InfixE (Just (AppE (AppE (VarE 'unsafeShiftR) (VarE w0)) (LitE (IntegerL $ fromIntegral ix)))) (VarE '(.&.)) (Just maskE)))))) []
                   ]
-                  --, ValD (VarP funname) (NormalB (LamE [ConP cname [] [VarP w1]] 
-                  --       (InfixE (Just (VarE 'fromIntegral)) (VarE '($)) (Just (InfixE (Just (AppE (AppE (VarE 'unsafeshiftR) (VarE w1)) (LitE (IntegerL $ fromIntegral ix)))) (VarE '(.&.)) (Just mask)))))) []
 
-        decSet ty (size, ix, len) = pure []
+        decSet ty tycon (size, ix, len) = do
+            let funname = mkFunctionName $ "set" <> name  
+                maskE0 = LitE $ IntegerL $ mkMaskIxLen ix len 
+                maskE1 = LitE $ IntegerL $ mkMaskN len 
+                ixE    = LitE $ IntegerL $ fromIntegral ix
+            w <- newName "w" 
+            w0 <- newName "w0" 
+            w1 <- newName "w1"
+            pure  [ SigD funname (ForallT [] [AppT (ConT ''Integral) (VarT w), AppT (ConT ''Bits) (VarT w)] (AppT (AppT ArrowT (VarT w)) (AppT ( AppT ArrowT (ConT ty)) (ConT ty))))
+                  , ValD (VarP funname) (NormalB (LamE [VarP w1,ConP tycon [] [VarP w0]] (InfixE (Just (ConE tycon)) (VarE '($)) (Just (InfixE (Just (InfixE (Just (VarE w0)) (VarE '(.&.)) (Just (AppE (VarE 'complement) (maskE0))))) (VarE '(.|.)) (Just (AppE (AppE (VarE 'unsafeShiftL) (InfixE (Just maskE1) (VarE '(.&.)) (Just (AppE (VarE 'fromIntegral) (VarE w1))))) ixE))))))) []]
+            
         decBit ty (size, ix, len) = pure []
 
 -- | 3 => 0b0111
-mkMaskN :: Word -> Exp
+mkMaskN :: Word -> Integer
 mkMaskN n = 
-    LitE $ IntegerL $ shiftL 0b1 (fromIntegral n) - 1
+    shiftL 0b1 (fromIntegral n) - 1
+
+mkMaskIxLen :: Word -> Word -> Integer
+mkMaskIxLen ix len = 
+    shiftL (shiftL 0b1 (fromIntegral len) - 1) (fromIntegral ix)
 
 mkFunctionName :: String -> Name
 mkFunctionName str = 
@@ -324,9 +318,9 @@ showRegister2 reg =
     --(toString $ registerName @reg) <> "==" <> showWord16 (coerce reg) 
 
 
--- | bitstring to (size, index, length). bitstring read as big endian since that 
---   is how bits and bytes are written programmatically
---   example: "0000***0" -> Right (8, 1, 3)
+-- | bitstring to (size, index, length). 
+--   bitstring read as big endian since that is how bits and bytes are 
+--   written in programming syntax. example: "00000***0" -> Right (9, 1, 3)
 bitstrToField :: String -> Either String (Word, Word, Word) 
 bitstrToField bitstr = 
     strip 0 $ reverse bitstr
@@ -343,6 +337,8 @@ bitstrToField bitstr =
           ('*':_)   -> Left $ "field is disconnected: " <> bitstr
           (_:as')   -> rest ix len (succ total) as'
           []        -> Right (total, ix, len)
+
+
 --------------------------------------------------------------------------------
 --  
 

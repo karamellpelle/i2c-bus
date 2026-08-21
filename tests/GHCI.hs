@@ -74,15 +74,15 @@ print16 a = putTextLn $ toText @String $ printf "%016b" $ un @Word16 a
 print8 :: Coercible Word8 a => a -> IO ()
 print8 a = putTextLn $ toText @String $ printf "%08b" $ un @Word8 a
 
-printTEMP :: TEMP -> IO ()
-printTEMP (TEMP w) = putTextLn $ toText @String $ printf "%08b" $ w
-
-t :: TEMP
-t = TEMP 0b01010100
+print8' :: Integral a => a -> IO ()
+print8' a = print8 (fromIntegral a :: Word8)
 
 $(register2 "MY_REG" 0x22 0xffdd)
 
 $(field ''MY_REG "MY_FIELD" "00000000000****0")
+
+a :: MY_REG
+a = MY_REG 0b0000111100011000
 
 testExp :: Word -> Q Exp
 testExp n =
