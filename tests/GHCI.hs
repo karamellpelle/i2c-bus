@@ -1,13 +1,15 @@
-{-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE CPP #-}
 {-# OPTIONS_GHC -ddump-splices #-}
+{-# OPTIONS_GHC -Wno-type-defaults #-}
+{-# OPTIONS_GHC -Wno-missing-export-lists #-}
 module GHCI where
 
-import Relude hiding (modify, modify')
+import Relude 
 import Relude.Extra.Newtype
 import I2C
 import I2C.Internal
+import I2C.Register
+import I2C.Raw
 import Data.Default
 import Text.Show qualified
 import Numeric
@@ -54,7 +56,7 @@ testDummy = do
 --  PCF8575
 
 -- this is a GPIO expander chip with 2 bytes => 16 pins
--- (no registers, only write and read 2 bytes
+-- (no registers, only write and read 2 bytes)
 --  * https://www.ti.com/lit/ds/symlink/pcf8575.pdf
 $(chip "PCF8575" 0x20)
 

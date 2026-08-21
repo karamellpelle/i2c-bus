@@ -24,30 +24,34 @@ module I2C.TH
   register1,
   register2,
 
-  -- TODO:
-  --registerN, -- register + length + Storable a (smbus block)
-  --registerRaw, -- register + Storable a (plain i2c)
-
-  bitstrToField,
 ) where
 
 import Relude hiding (Type)
-import I2C.Internal
 import Data.Default
+import Foreign
 import Numeric
 import Text.Show qualified
 import Data.Char (toUpper)
+
+import I2C.Types
+import I2C.Chip
+import I2C.Internal
+import I2C.Register
+import I2C.Raw
 
 import Language.Haskell.TH
 import Language.Haskell.TH.Syntax
 import Language.Haskell.TH.Lib
 
+
 --------------------------------------------------------------------------------
---  create Chip's and Registers' through Template Haskell 
+--  create Chips and Registers through Template Haskell 
+--------------------------------------------------------------------------------
+
 
 -- | declare a Chip with name 'name' at _7_ bit bus address 'addr'
 --
--- > $(chip "Chip123" 0x22) -- =>
+-- > $(chip "Chip123" 0x22)  =>
 -- >   
 -- > data Chip123
 -- > instance Chip Chip123 where

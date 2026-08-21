@@ -45,8 +45,6 @@ module I2C.Internal.Linux
 
 import Relude
 import Relude.Extra.Newtype
-import I2C.Chip
-import I2C.Exception
 import System.Posix.IO
 import System.Posix.Types
 import Numeric
@@ -58,15 +56,19 @@ import Control.Exception
 import GHC.IO.Exception
 import Data.Char (toUpper)
 
-showWord8 :: Word8 -> String
-showWord8 w | 0x10 <= w   = fmap toUpper $ showHex w ""
-            | otherwise   = fmap toUpper $ "0" <> showHex w ""
+import I2C.Types
+import I2C.Chip
+import I2C.Exception
+
+
 --------------------------------------------------------------------------------
 --  connect to hardware device on bus
 
--- | /* Use this slave address, even if it is already in use by a driver! */
-#define I2C_SLAVE_FORCE	0x0706	
+-- |  > /* Use this slave address, even if it is already in use by a driver! */
+--    > #define I2C_SLAVE_FORCE	0x0706	
 
+cpp_I2C_SLAVE_FORCE :: CULong
+cpp_I2C_SLAVE_FORCE = 0x0706	
 
 -- | connection to a hardware device on bus
 data BusDevice chip = 
@@ -85,7 +87,7 @@ openChip ident = do
         Left err   -> throwIO $ fromIOException err
         Right fd   -> do
             let addr = chipAddress @chip
-            _ <- assertOK (tagErr ident addr) $ c_ioctl (fromIntegral fd) I2C_SLAVE_FORCE (fromChipAddress addr)
+            _ <- assertOK (tagErr ident addr) $ c_ioctl (fromIntegral fd) cpp_I2C_SLAVE_FORCE (fromChipAddress addr)
             pure $ BusDevice @chip ident $ fdToPtrI2C_Client fd
     where
       fromIdentifier = toString

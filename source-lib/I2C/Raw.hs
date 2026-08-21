@@ -17,36 +17,37 @@
 -- LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 -- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 -- SOFTWARE.
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE AllowAmbiguousTypes #-}
-{-# LANGUAGE FunctionalDependencies #-}
---{-# LANGUAGE UndecidableInstances #-}
-module I2C
+module I2C.Raw
 (
-    
-    Chip (..),
-
-    BusDevice,
-    openChip,
-    closeChip,
-
-    Register (..),
-
     rawread,
     rawwrite,
     rawmodify,
 
-    regreadRaw,
-    regwriteRaw,
-    regmodifyRaw,
-
-    
-    module I2C.TH,
 ) where
 
-import I2C.Types
-import I2C.Chip
+import Relude 
+import Foreign
+
 import I2C.Internal
-import I2C.Register
-import I2C.Raw
-import I2C.TH
+import I2C.Chip
+
+----------------------------------------------------------------------------------
+-- raw read and write without registers
+-- 
+
+rawread :: forall chip a m . (Chip chip, Storable a, MonadIO m) => BusDevice chip -> m a
+rawread busdev = liftIO $
+    readRaw @chip busdev
+
+rawwrite :: forall chip a m . (Chip chip, Storable a, MonadIO m)  => BusDevice chip -> a -> m ()
+rawwrite busdev = \a -> liftIO $
+    writeRaw @chip busdev a
+
+rawmodify :: forall chip a m . (Chip chip, Storable a, MonadIO m)  => BusDevice chip -> (a -> a) -> m a
+rawmodify busdev = \f -> liftIO $ do
+    a <- rawread @chip busdev
+    let a' = f a
+    rawwrite @chip busdev a'
+    pure a'
+
+

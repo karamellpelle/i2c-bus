@@ -18,26 +18,50 @@
 -- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 -- SOFTWARE.
 {-# LANGUAGE AllowAmbiguousTypes #-}
-module I2C.Chip
+module I2C.Types
 (
-    Chip (..),
+    ChipAddress (..),
+    fromChipAddress,
 
+    RegisterAddress (..),
+    fromRegisterAddress,
 
 ) where
 
 import Relude
 import Text.Show qualified
 
-import I2C.Types
+import Numeric (showHex)
+import Data.Char (toUpper)
 
 --------------------------------------------------------------------------------
---  chip
+--  chip address
 
--- | typeclass for I2C chips
-class Chip chip where
-    -- | _7 bit_ address on I2C bus, i.e. the 8 bit R/W addresses shifted down by 1
-    chipAddress :: ChipAddress
-    -- | human readable identifier
-    chipName :: Text
-    chipName = "unknown@" <> (show $ chipAddress @chip)
+-- | hardware's address on bus
+newtype ChipAddress = ChipAddress Word8
+    deriving (Num)
+
+instance Show ChipAddress where
+    show (ChipAddress w) = 
+        (if 0x10 <= w then "0x" else "0x0") <> fmap toUpper (showHex w "")
+
+-- | convert from ChipAddress
+fromChipAddress :: Num b => ChipAddress -> b
+fromChipAddress (ChipAddress addr) = fromIntegral addr
+
+
+--------------------------------------------------------------------------------
+--  registers addressing inside chips
+--  our registers are always of size 1 byte 
+
+-- | register address
+newtype RegisterAddress = RegisterAddress Word8
+    deriving (Num)
+
+instance Show RegisterAddress where
+    show (RegisterAddress w) =
+        (if 0x10 <= w then "0x" else "0x0") <> fmap toUpper (showHex w "")
+
+fromRegisterAddress :: Num b => RegisterAddress -> b
+fromRegisterAddress (RegisterAddress addr) = fromIntegral addr
 

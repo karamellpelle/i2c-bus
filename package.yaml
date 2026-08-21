@@ -5,7 +5,7 @@ spec-version: 0.36.0
 name:
     i2c-registers
 version:
-    0.2
+    0.3
 github:
     karamellpelle/piradio
 homepage:
@@ -24,7 +24,6 @@ category:
     - hardware
     - chip
     - i2c
-    - smbus
 extra-source-files:
     - README.md
     - CHANGELOG.md
@@ -78,6 +77,12 @@ library:
     source-dirs: source-lib
     exposed-modules:
         - I2C
+        - I2C.Types
+        - I2C.Chip
+        - I2C.Internal
+        - I2C.Register
+        - I2C.Raw
+        - I2C.TH
     other-extensions:
         - CPP
     when: 
