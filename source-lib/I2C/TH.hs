@@ -54,6 +54,7 @@ import Language.Haskell.TH.Lib
 -- > $(chip "Chip123" 0x22)  =>
 -- >   
 -- > data Chip123
+-- >
 -- > instance Chip Chip123 where
 -- >     chipAddress = 0x22
 -- >     chipName = "Chip123"
@@ -80,22 +81,25 @@ chip name addr = do
 
 
 
--- | declare a register of Chip that contains Word8
+-- | declare a register of Chip that contains Word8 data
 --
 -- > $(register1 "REG_SMALL" 0xF0 0x01) =>
 -- > 
 -- >   newtype REG_SMALL = REG_SMALL Word8
+-- >
 -- >   instance Register REG_SMALL where
 -- >       registerAddress = 0xF0
 -- >       registerName = "REG_SMALL"
 -- >       regread = regreadRegister1
 -- >       regwrite = regwriteRegister1
 -- >       regmodify = regmodifyRegister1
+-- >
 -- >   instance Default REG_SMALL where
 -- >       def = REG_SMALL 0x01
+-- >
 -- >   instance Show REG_SMALL where
 -- >       show = showRegister1
--- 
+-- >
 register1 :: String -> RegisterAddress -> Word8 -> Q [Dec]
 register1 name addr def = do
     let name' = mkName name
@@ -161,6 +165,51 @@ register2 name addr def = do
       decInstanceShow :: Name -> Q Dec
       decInstanceShow tname =
           instanceD (cxt []) (appT (conT ''Show) (conT tname)) $ one $ decFunctionAlias 'Text.Show.show 'showRegister2
+
+--------------------------------------------------------------------------------
+--  helpers for Register instancing
+
+regreadRegister1 :: forall chip reg m . (Chip chip, Register reg, Coercible Word8 reg, MonadIO m) => 
+                    BusDevice chip -> m reg
+regreadRegister1 busdev = 
+    fmap coerce $ regread1 @chip busdev (registerAddress @reg)
+
+regwriteRegister1 :: forall chip reg m . (Chip chip, Register reg, Coercible Word8 reg, Default reg, MonadIO m) => 
+                     BusDevice chip -> (reg -> reg) -> m reg
+regwriteRegister1 busdev = \f -> do
+    let r' = f def
+    regwrite1 @chip busdev (registerAddress @reg) (coerce $ r')
+    pure r'
+
+regmodifyRegister1 :: forall chip reg m . (Chip chip, Register reg, Coercible Word8 reg, MonadIO m) => 
+            BusDevice chip -> (reg -> reg) -> m reg
+regmodifyRegister1 busdev = \f -> do
+    r <- regreadRegister1 busdev
+    let r' = f r
+    regwrite1 busdev (registerAddress @reg) $ coerce $ r'
+    pure r'
+
+     
+regreadRegister2 :: forall chip reg m . (Chip chip, Register reg, Coercible Word16 reg, MonadIO m) => 
+            BusDevice chip -> m reg
+regreadRegister2 busdev =
+    fmap coerce $ regread2 @chip busdev (registerAddress @reg)
+
+regwriteRegister2 :: forall chip reg m . (Chip chip, Register reg, Coercible Word16 reg, Default reg, MonadIO m) => 
+            BusDevice chip -> (reg -> reg) -> m reg
+regwriteRegister2 busdev = \f -> do
+    let r' = f def
+    regwrite2 @chip busdev (registerAddress @reg) $ coerce $ r'
+    pure r'
+
+regmodifyRegister2 :: forall chip reg m . (Chip chip, Register reg, Coercible Word16 reg, MonadIO m) => 
+            BusDevice chip -> (reg -> reg) -> m reg
+regmodifyRegister2 busdev = \f -> do
+    r <- regreadRegister2 busdev
+    let r' = f r
+    regwrite2 busdev (registerAddress @reg) $ coerce $ r'
+    pure r'
+
 
 {-
 field :: Name -> String -> String -> Q [Dec]

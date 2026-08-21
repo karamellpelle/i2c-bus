@@ -32,15 +32,6 @@ module I2C
 
     Register (..),
 
-    rawread,
-    rawwrite,
-    rawmodify,
-
-    regreadRaw,
-    regwriteRaw,
-    regmodifyRaw,
-
-    
     module I2C.TH,
 ) where
 

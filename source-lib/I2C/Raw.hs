@@ -28,22 +28,22 @@ module I2C.Raw
 import Relude 
 import Foreign
 
-import I2C.Internal
+import I2C.Internal qualified as Internal
 import I2C.Chip
 
 ----------------------------------------------------------------------------------
 -- raw read and write without registers
 -- 
 
-rawread :: forall chip a m . (Chip chip, Storable a, MonadIO m) => BusDevice chip -> m a
+rawread :: forall chip a m . (Chip chip, Storable a, MonadIO m) => Internal.BusDevice chip -> m a
 rawread busdev = liftIO $
-    readRaw @chip busdev
+    Internal.readRaw @chip busdev
 
-rawwrite :: forall chip a m . (Chip chip, Storable a, MonadIO m)  => BusDevice chip -> a -> m ()
+rawwrite :: forall chip a m . (Chip chip, Storable a, MonadIO m)  => Internal.BusDevice chip -> a -> m ()
 rawwrite busdev = \a -> liftIO $
-    writeRaw @chip busdev a
+    Internal.writeRaw @chip busdev a
 
-rawmodify :: forall chip a m . (Chip chip, Storable a, MonadIO m)  => BusDevice chip -> (a -> a) -> m a
+rawmodify :: forall chip a m . (Chip chip, Storable a, MonadIO m)  => Internal.BusDevice chip -> (a -> a) -> m a
 rawmodify busdev = \f -> liftIO $ do
     a <- rawread @chip busdev
     let a' = f a

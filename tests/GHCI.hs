@@ -19,20 +19,23 @@ import Text.Pretty.Simple
 import Text.Printf
 import Control.Concurrent
 
--- # load ghci with linux build:
+--
+-- * load ghci with linux build:
 --    $ stack ghci --package=pretty-simple  --flag=i2c:-build-empty --flag=i2c:build-linux
--- # load ghci with dummy build:
+-- * load ghci with dummy build:
 --    $ stack ghci --package=pretty-simple  --flag=i2c:build-empty --flag=i2c:-build-linux
+--
 -- then load this file:
 --    ghci> :l tests/GHCI.hs
 --  
--- (if you get link errors, run `stack test` which will build the FFI parts,
---  and those symbols will then be available in GHCi) 
+-- if you get link errors, run `stack test` which will build the FFI parts,
+-- and those symbols will then be available in GHCi
 
 
 --------------------------------------------------------------------------------
 --  dummy
 
+{-
 $(chip "Chip123" 0xDE)
 
 $(register1 "REG_WORD8"  0x10 0x0A)
@@ -50,6 +53,7 @@ testDummy = do
 
     pPrint $ "Default REG_WORD8:  " <> show (def :: REG_WORD8)
     pPrint $ "Default REG_WORD16: " <> show (def :: REG_WORD16)
+-}
 
 
 --------------------------------------------------------------------------------
@@ -68,10 +72,13 @@ testPCF8575 = do
         rawwrite @PCF8575 @Word16 busdev ix
         threadDelay 400000
 
+$(register1 "CTRL" 0x01 0xa0)
+$(register2 "XTAL" 0x02 0x01)
 
 --------------------------------------------------------------------------------
 --  MPU6050
 
+{-
 -- this is a accelerometer and gyroscope chip with registers
 --  * https://randomnerdtutorials.com/arduino-mpu-6050-accelerometer-gyroscope/
 --  * https://github.com/adafruit/Adafruit_MPU6050/blob/master/Adafruit_MPU6050.cpp
@@ -80,6 +87,7 @@ testPCF8575 = do
 $(chip "MPU6050" 0x68)
 
 $(register1 "USER_CTRL" 106 0x00)
+
 $(register1 "INT_PIN_CFG" 55 0x00)
 $(register1 "PWR_MGMT_1" 107 0x40)
 
@@ -121,5 +129,5 @@ testMPU6050 = do
       putTextLn ""
 
       -- ^ output doesn't look right, maybe the register setups are wrong :)
-
       threadDelay 400000
+-}
