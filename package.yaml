@@ -99,6 +99,8 @@ library:
           - cbits/smbus.c
           - cbits/foreign.c
         include-dirs: 
+          # https://stackoverflow.com/questions/18858190/whats-in-include-uapi-of-kernel-source-project
+          - /usr/include
           - include
         other-extensions:
           - ForeignFunctionInterface
