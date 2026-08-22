@@ -19,7 +19,6 @@
 -- SOFTWARE.
 {-# LANGUAGE ForeignFunctionInterface #-}
 {-# OPTIONS_GHC -Wno-redundant-constraints #-}
-{-# LANGUAGE CPP #-}
 module I2C.Internal.Linux
 (
     BusDevice (..),

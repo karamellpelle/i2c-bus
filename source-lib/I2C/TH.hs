@@ -173,14 +173,26 @@ register2 name addr def = do
 
 
 -- | declare a (sub)field of a register 
-
- --
- --   field ''MY_REG "MY_FIELD" "00000000000****0"
- -- ======>
- --   getMY_FIELD :: (Integral w1, Bits w1) => MY_REG -> w1
- --   getMY_FIELD = \(MY_REG w0) -> fromIntegral $ (unsafeShiftR w0 1 .&. 0b0000000000001111)
- --   setMY_FIELD :: (Integral w, Bits w) => w -> MY_REG -> MY_REG
- --   setMY_FIELD = \w1 (MY_REG w0) -> MY_REG $ ((w0 .&. complement 0b0000000000011110) .|. unsafeShiftL (0b0000000000001111 .&. fromIntegral w1) 1)
+--
+--   field ''REG16 "MY_FIELD" "00000000000****0"
+-- ======>
+--   getMY_FIELD :: (Integral w1) => MY_REG -> w1
+--   getMY_FIELD = \(REG16 w0) -> fromIntegral $ (unsafeShiftR w0 1 .&. 0b0000000000001111)
+--   setMY_FIELD :: (Integral w) => w -> REG16 -> REG16
+--   setMY_FIELD = \w1 (REG16 w0) -> REG16 $ ((w0 .&. complement 0b0000000000011110) .|. unsafeShiftL (0b0000000000001111 .&. fromIntegral w1) 1)
+--
+--   field ''REG8 "MY_BIT" "00*00000"
+-- ======>
+--   getMY_BIT :: Integral w1 => REG8 -> w1
+--   getMY_BIT = \(REG8 w0) -> (fromIntegral $ (unsafeShiftR w0 5 .&. 1))
+--   setMY_BIT :: Integral w => w -> REG8 -> REG8
+--   setMY_BIT = \w1 (REG8 w0) -> (REG8 $ ((w0 .&. complement 0b00100000) .|. unsafeShiftL (0b00000001 .&. fromIntegral w1) 5))
+--   bitsetMY_BIT :: REG8 -> REG8
+--   bitsetMY_BIT = under @Word8 (flip setBit 5)
+--   bitclearMY_BIT :: REG8 -> REG8
+--   bitclearMY_BIT = under @Word8 (flip clearBit 5)
+--   bittoggleMY_BIT :: REG8 -> REG8
+--   bittoggleMY_BIT = under @Word8 (flip complementBit 5)
 field :: Name -> String -> String -> Q [Dec]
 field ty name bitstr = case bitstrToField bitstr of
     Left err              -> fail err
@@ -200,7 +212,7 @@ field ty name bitstr = case bitstrToField bitstr of
                 maskE = LitE $ IntegerL $ mkMaskN len 
             w0 <- newName "w0" 
             w1 <- newName "w1"
-            pure  [ SigD funname (ForallT [] [AppT (ConT ''Integral) (VarT w1), AppT (ConT ''Bits) (VarT w1)] (AppT (AppT ArrowT (ConT ty)) (VarT w1)))
+            pure  [ SigD funname (ForallT [] [AppT (ConT ''Integral) (VarT w1)] (AppT (AppT ArrowT (ConT ty)) (VarT w1)))
                   , ValD (VarP funname) (NormalB (LamE [ConP tycon [] [VarP w0]] 
                          (InfixE (Just (VarE 'fromIntegral)) (VarE '($)) (Just (InfixE (Just (AppE (AppE (VarE 'unsafeShiftR) (VarE w0)) (LitE (IntegerL $ fromIntegral ix)))) (VarE '(.&.)) (Just maskE)))))) []
                   ]
@@ -213,7 +225,7 @@ field ty name bitstr = case bitstrToField bitstr of
             w <- newName "w" 
             w0 <- newName "w0" 
             w1 <- newName "w1"
-            pure  [ SigD funname (ForallT [] [AppT (ConT ''Integral) (VarT w), AppT (ConT ''Bits) (VarT w)] (AppT (AppT ArrowT (VarT w)) (AppT ( AppT ArrowT (ConT ty)) (ConT ty))))
+            pure  [ SigD funname (ForallT [] [AppT (ConT ''Integral) (VarT w)] (AppT (AppT ArrowT (VarT w)) (AppT ( AppT ArrowT (ConT ty)) (ConT ty))))
                   , ValD (VarP funname) (NormalB (LamE [VarP w1,ConP tycon [] [VarP w0]] (InfixE (Just (ConE tycon)) (VarE '($)) (Just (InfixE (Just (InfixE (Just (VarE w0)) (VarE '(.&.)) (Just (AppE (VarE 'complement) (maskE0))))) (VarE '(.|.)) (Just (AppE (AppE (VarE 'unsafeShiftL) (InfixE (Just maskE1) (VarE '(.&.)) (Just (AppE (VarE 'fromIntegral) (VarE w1))))) ixE))))))) []]
             
         decBit tywrap ty (size, ix, len) = do
@@ -224,7 +236,7 @@ field ty name bitstr = case bitstrToField bitstr of
                       , ValD (VarP funname) (NormalB (AppE (AppTypeE (VarE 'under) (ConT tywrap)) (AppE (AppE (VarE 'flip) (VarE underF)) ixE)))
                       []]
 
--- | 3 => 0b0111
+-- 3 => 0b0111
 mkMaskN :: Word -> Integer
 mkMaskN n = 
     shiftL 0b1 (fromIntegral n) - 1
@@ -236,6 +248,15 @@ mkMaskIxLen ix len =
 mkFunctionName :: String -> Name
 mkFunctionName str = 
     Name (OccName str) NameS
+
+--fieldGet :: (Integral w1, Bits w1) => Word -> w0 -> (w0 -> w1)
+--fieldGet ix mask = \w0 -> fromIntegral $ (unsafeShiftR w0 (fromIntegral ix) .&. mask)
+--
+--    getMY_FIELD :: (Integral w1, Bits w1) => MY_REG -> w1
+--    getMY_FIELD = \(MY_REG w0) -> fromIntegral $ (unsafeShiftR w0 1 .&. 0b0000000000001111)
+--    setMY_FIELD :: (Integral w, Bits w) => w -> MY_REG -> MY_REG
+--    setMY_FIELD = \w1 (MY_REG w0) -> MY_REG $ ((w0 .&. complement 0b0000000000011110) .|. unsafeShiftL (0b0000000000001111 .&. fromIntegral w1) 1)
+--
 
 --------------------------------------------------------------------------------
 --  helpers for Register instancing

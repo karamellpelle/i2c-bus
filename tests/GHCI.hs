@@ -1,5 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE FlexibleInstances #-}
+--{-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -ddump-splices #-}
 {-# OPTIONS_GHC -Wno-type-defaults #-}
 {-# OPTIONS_GHC -Wno-missing-export-lists #-}
@@ -11,6 +12,7 @@ import I2C
 import I2C.Internal
 import I2C.Register
 import I2C.Raw
+import I2C.Types
 import Data.Default
 import Text.Show qualified
 import Numeric
@@ -37,11 +39,6 @@ import Language.Haskell.TH.Lib
 -- if you get link errors, run `stack test` which will build the FFI parts,
 -- and those symbols will then be available in GHCi
 
---------------------------------------------------------------------------------
---  TH helpers
---printQ :: Quasi m => Q a -> m ()
---printQ ma = pPrint =<< runQ ma
-
 print16 :: Coercible Word16 a => a -> IO ()
 print16 a = putTextLn $ toText @String $ printf "%016b" $ un @Word16 a
 
@@ -51,28 +48,29 @@ print8 a = putTextLn $ toText @String $ printf "%08b" $ un @Word8 a
 print8' :: Integral a => a -> IO ()
 print8' a = print8 (fromIntegral a :: Word8)
 
-$(register2 "MY_REG" 0x22 0xffdd)
-$(register1 "MY_SMALL" 0x22 0xffdd)
+print16' :: Integral a => a -> IO ()
+print16' a = print16 (fromIntegral a :: Word16)
 
-$(field ''MY_REG "MY_FIELD" "00000000000****0")
-$(field ''MY_REG "MY_ENABLE" "00*0000000000000")
-$(field ''MY_SMALL "SMALL_ENABLE" "00*0000000000000")
+$(register1 "MY_REG8" 0x22 0x83)
+$(register2 "MY_REG16" 0x44 0x1122)
 
-bitsetENABLE_A :: MY_REG -> MY_REG
---bitsetENABLE_A = \(MY_REG w) -> MY_REG $ 
-bitsetENABLE_A = under @Word16 (flip setBit 6)
+$(field ''MY_REG16 "FIELD_A"  "00000000000****0")
+$(field ''MY_REG16 "BIT_B"    "00*0000000000000")
+$(field ''MY_REG8  "FIELD_C"  "0000***0")
+$(field ''MY_REG8  "BIT_D"    "00*00000")
 
-bitclearENABLE_A :: MY_REG -> MY_REG
-bitclearENABLE_A = under @Word16 (flip clearBit 6)
-bittoggleENABLE_A :: MY_REG -> MY_REG
-bittoggleENABLE_A = under @Word16 (flip complementBit 6)
+a :: MY_REG16
+a = MY_REG16 0b0000111100011000
 
-a :: MY_REG
-a = MY_REG 0b0000111100011000
+b :: MY_REG8
+b = MY_REG8 0b00000110
 
-testExp :: Word -> Q Exp
-testExp n =
-    [e| pPrint n|]
+------------------------------------------------------------------------------
+-- TH helpers
+printQ :: Show a => Q a -> IO ()
+printQ ma = do
+    a <- runQ ma
+    pPrint a
 
 --------------------------------------------------------------------------------
 --  dummy

@@ -39,4 +39,31 @@ import I2C.Internal.Linux
 import I2C.Internal.Empty
 #endif
 
+{-
+-- Internal.X API
+-- BusDevice chip (..)
+-- openChip :: forall chip . (Chip chip) => Text -> IO (BusDevice chip)
+-- closeChip :: forall chip . (Chip chip) => BusDevice chip -> IO ()
+-- 
+-- read :: Storable w, Storable r  => BusDevice chip -> w -> IO r
+-- readSome :: Storable w => BusDevice chip -> w -> IO ByteString
+-- write :: Storable w => BusDevice chip -> w -> IO ()
+-- writeSome :: Storable w => BusDevice chip -> w -> IO ()
 
+
+writeRegWord16 :: Word8 -> Word16 -> 
+writeRegWord16 busdev reg w = 
+    Internal.write busdev (reg + mkLE16 w)
+
+newtype LE16 = LE16 Word16
+#if PLATFORM_LITTLE_ENDIAN
+    deriving (Storable)
+#else 
+instance Storable LE16 where
+    poke =
+    peek =
+#endif
+
+mkLE16 :: Word16 -> LE16
+mkLE16 w = LE16 Word16
+-}

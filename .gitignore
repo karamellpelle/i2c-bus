@@ -1,4 +1,5 @@
 .stack-work/
+Tmp/
 *~
 *.swp
 .*.swo

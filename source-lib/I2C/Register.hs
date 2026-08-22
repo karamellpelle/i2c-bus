@@ -58,7 +58,7 @@ class Register reg where
     registerName :: Text
     registerName = "unknown@" <> (show $ registerAddress @reg)
 
-    -- | type of content
+    -- | type of content in register
     type RegisterItem reg
 
     -- | bus functions
