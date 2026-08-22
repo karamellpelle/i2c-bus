@@ -29,6 +29,7 @@ module I2C.TH
 ) where
 
 import Relude hiding (Type)
+import Relude.Extra.Newtype
 import Data.Default
 import Foreign
 import Numeric
@@ -184,18 +185,17 @@ field :: Name -> String -> String -> Q [Dec]
 field ty name bitstr = case bitstrToField bitstr of
     Left err              -> fail err
     Right sil@(size, ix, len) -> do
-        tycon <- nameTyCon ty
-        dGet <- decGet ty tycon sil
-        dSet <- decSet ty tycon sil
-        dBit <- if len == 1 then decBit ty sil else mempty
+        --info <- reify ty
+        --runIO $ print info
+  
+        TyConI (NewtypeD _ _ty _ _ (NormalC tycon [(_, ConT tywrap)]) _)  <- reify ty
+        dGet <- decGet tywrap ty tycon sil
+        dSet <- decSet tywrap ty tycon sil
+        dBit <- if len == 1 then decBit tywrap ty sil else mempty
         pure $ dGet <> dSet <> dBit
     where
-        nameTyCon :: Name -> Q Name
-        nameTyCon ty = do
-            TyConI (NewtypeD _ _ty _ _ (NormalC tycon [(_, ConT _tywrapped)]) _)  <- reify ty
-            pure tycon
 
-        decGet ty tycon (size, ix, len) = do
+        decGet tywrap ty tycon (size, ix, len) = do
             let funname = mkFunctionName $ "get" <> name  
                 maskE = LitE $ IntegerL $ mkMaskN len 
             w0 <- newName "w0" 
@@ -205,7 +205,7 @@ field ty name bitstr = case bitstrToField bitstr of
                          (InfixE (Just (VarE 'fromIntegral)) (VarE '($)) (Just (InfixE (Just (AppE (AppE (VarE 'unsafeShiftR) (VarE w0)) (LitE (IntegerL $ fromIntegral ix)))) (VarE '(.&.)) (Just maskE)))))) []
                   ]
 
-        decSet ty tycon (size, ix, len) = do
+        decSet tywrap ty tycon (size, ix, len) = do
             let funname = mkFunctionName $ "set" <> name  
                 maskE0 = LitE $ IntegerL $ mkMaskIxLen ix len 
                 maskE1 = LitE $ IntegerL $ mkMaskN len 
@@ -216,7 +216,13 @@ field ty name bitstr = case bitstrToField bitstr of
             pure  [ SigD funname (ForallT [] [AppT (ConT ''Integral) (VarT w), AppT (ConT ''Bits) (VarT w)] (AppT (AppT ArrowT (VarT w)) (AppT ( AppT ArrowT (ConT ty)) (ConT ty))))
                   , ValD (VarP funname) (NormalB (LamE [VarP w1,ConP tycon [] [VarP w0]] (InfixE (Just (ConE tycon)) (VarE '($)) (Just (InfixE (Just (InfixE (Just (VarE w0)) (VarE '(.&.)) (Just (AppE (VarE 'complement) (maskE0))))) (VarE '(.|.)) (Just (AppE (AppE (VarE 'unsafeShiftL) (InfixE (Just maskE1) (VarE '(.&.)) (Just (AppE (VarE 'fromIntegral) (VarE w1))))) ixE))))))) []]
             
-        decBit ty (size, ix, len) = pure []
+        decBit tywrap ty (size, ix, len) = do
+            fmap concat $ forM [("bitset", 'setBit), ("bitclear", 'clearBit), ("bittoggle", 'complementBit)] $ \(prefix, underF) -> do
+                let funname = mkFunctionName $ prefix <> name  
+                    ixE     = LitE $ IntegerL $ fromIntegral ix
+                pure  [ SigD funname (AppT (AppT ArrowT (ConT ty)) (ConT ty))
+                      , ValD (VarP funname) (NormalB (AppE (AppTypeE (VarE 'under) (ConT tywrap)) (AppE (AppE (VarE 'flip) (VarE underF)) ixE)))
+                      []]
 
 -- | 3 => 0b0111
 mkMaskN :: Word -> Integer

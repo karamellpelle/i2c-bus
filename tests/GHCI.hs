@@ -55,6 +55,8 @@ $(register2 "MY_REG" 0x22 0xffdd)
 $(register1 "MY_SMALL" 0x22 0xffdd)
 
 $(field ''MY_REG "MY_FIELD" "00000000000****0")
+$(field ''MY_REG "MY_ENABLE" "00*0000000000000")
+$(field ''MY_SMALL "SMALL_ENABLE" "00*0000000000000")
 
 bitsetENABLE_A :: MY_REG -> MY_REG
 --bitsetENABLE_A = \(MY_REG w) -> MY_REG $ 
