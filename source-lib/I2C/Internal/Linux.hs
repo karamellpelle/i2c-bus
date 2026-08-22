@@ -119,7 +119,7 @@ read :: forall chip w r . (Chip chip, Storable w, Storable r)  =>
 read busdev@(BusDevice _id ptr) = \w -> do
     undefined
     --res <- try @IOException $ allocaArray len $ \arr -> do
-    --    _ <- assertOK (tagErr busdev) $ c_read_raw ptr arr (fromIntegral len)
+    --    _ <- assertOK (tagErr busdev) $ c_read_raw ptr addr arr (fromIntegral len)
     --    peek $ castPtr arr
     --
     --case res of
@@ -141,21 +141,21 @@ writeSome :: forall chip w r . (Chip chip, Storable w) =>
              BusDevice chip -> w -> IO ()
 writeSome = undefined
 
--- | int i2c_read(int fd, uint8_t* wbuf, size_t wbuf_len, uint8_t* rbuf, size_t rbuf_len);
+-- | int i2c_read(int fd, uint8_t addr, uint8_t* wbuf, size_t wbuf_len, uint8_t* rbuf, size_t rbuf_len);
 foreign import ccall safe "foreign.h i2c_read" c_i2c_read
-    :: Ptr I2C_Client -> Ptr Word8 -> CSize -> Ptr Word8 -> CSize -> IO CInt
+    :: Ptr I2C_Client -> Word8 -> Ptr Word8 -> CSize -> Ptr Word8 -> CSize -> IO CInt
 
--- | int i2c_read_some(int fd, uint8_t* wbuf, size_t wbuf_len, uint8_t* rbuf, size_t rbuf_len);
+-- | int i2c_read_some(int fd, uint8_t addr, uint8_t* wbuf, size_t wbuf_len, uint8_t* rbuf, size_t rbuf_len);
 foreign import ccall safe "foreign.h i2c_read_some" c_i2c_read_some
-    :: Ptr I2C_Client -> Ptr Word8 -> CSize -> Ptr Word8 -> CSize -> IO CInt
+    :: Ptr I2C_Client -> Word8 -> Ptr Word8 -> CSize -> Ptr Word8 -> CSize -> IO CInt
 
--- | int i2c_write(int fd, uint8_t* wbuf, size_t wbuf_len);
+-- | int i2c_write(int fd, uint8_t addr, uint8_t* wbuf, size_t wbuf_len);
 foreign import ccall safe "foreign.h i2c_write" c_i2c_write
-    :: Ptr I2C_Client -> Ptr Word8 -> CSize -> IO CInt
+    :: Ptr I2C_Client -> Word8 -> Ptr Word8 -> CSize -> IO CInt
 
--- | int i2c_write_some(int fd, uint8_t* wbuf, size_t wbuf_len);
+-- | int i2c_write_some(int fd, uint8_t addr, uint8_t* wbuf, size_t wbuf_len);
 foreign import ccall safe "foreign.h i2c_write_some" c_i2c_write_some
-    :: Ptr I2C_Client -> Ptr Word8 -> CSize -> IO CInt
+    :: Ptr I2C_Client -> Word8 -> Ptr Word8 -> CSize -> IO CInt
 
 --------------------------------------------------------------------------------
 --  raw I2C read/write, no registers (SMBus free)

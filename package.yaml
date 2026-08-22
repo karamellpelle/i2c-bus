@@ -24,6 +24,7 @@ category:
     - hardware
     - chip
     - i2c
+    #- eeprom
 extra-source-files:
     - README.md
     - CHANGELOG.md
@@ -96,12 +97,11 @@ library:
         dependencies: 
           - unix
         c-sources: 
-          - cbits/smbus.c
           - cbits/foreign.c
         include-dirs: 
           # https://stackoverflow.com/questions/18858190/whats-in-include-uapi-of-kernel-source-project
           - /usr/include
-          - include
+          - cbits
         other-extensions:
           - ForeignFunctionInterface
 

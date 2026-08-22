@@ -121,51 +121,73 @@ int regwrite_raw(int fd, uint8_t* buf, size_t len)
     return 0;
 }
 
-int i2c_read(int fd, uint8_t* wbuf, size_t wbuf_len, uint8_t* rbuf, size_t rbuf_len)
+////////////////////////////////////////////////////////////////////////////////
+// see `i2c_rdwr_ioctl_data` at https://www.kernel.org/doc/html/latest/i2c/dev-interface.html#full-interface-description
+int i2c_read(int fd, uint8_t addr, uint8_t* wbuf, size_t wbuf_len, uint8_t* rbuf, size_t rbuf_len)
 {
-    struct i2c_client* client = (struct i2c_client*)( fd );
-    /*struct i2c_adapter* adapter = client->adapter;*/
-    struct i2c_msg messages[2]; // https://github.com/raspberrypi/linux/blob/65495647821026e14223095d1b0124aa3d502dec/include/uapi/linux/i2c.h#L74
+    // https://github.com/raspberrypi/linux/blob/65495647821026e14223095d1b0124aa3d502dec/include/uapi/linux/i2c.h#L74
+    struct i2c_msg messages[2]; 
     
     // write
-    messages[0].addr = client->addr;
+    messages[0].addr  = addr;
     messages[0].flags = 0;
-    messages[0].len = wbuf_len;
-    messages[0].buf = wbuf;
+    messages[0].len   = wbuf_len;
+    messages[0].buf   = wbuf;
     // read
-    messages[1].addr = client->addr;
+    messages[1].addr  = addr;
     messages[1].flags = I2C_M_RD;
-    messages[1].len = rbuf_len;
-    messages[1].buf = rbuf;
+    messages[1].len   = rbuf_len;
+    messages[1].buf   = rbuf;
 
-    // transfer with repeated START
+    struct i2c_rdwr_ioctl_data rdwr;
+    rdwr.msgs = messages;
+    rdwr.nmsgs = 2;
+
+    // transfer messages with repeated START (i.e. this is the `i2c_transfer` function in user API)
     // FIXME what is res? cf. comment https://github.com/raspberrypi/linux/blob/65495647821026e14223095d1b0124aa3d502dec/drivers/i2c/i2c-core-base.c#L2322
-    int res = i2c_transfer( client->adapter, messages, 2 ); // https://github.com/raspberrypi/linux/blob/65495647821026e14223095d1b0124aa3d502dec/include/linux/i2c.h#L130
+    int res = ioctl( fd, I2C_RDWR, &rdwr );
+    
+    if (res < 0) return -EIO; // FIXME!
+    
+    return res;
 }
 
-int i2c_read_some(int fd, uint8_t* wbuf, size_t wbuf_len, uint8_t* rbuf, size_t rbuf_len)
+int i2c_read_some(int fd, uint8_t addr, uint8_t* wbuf, size_t wbuf_len, uint8_t* rbuf, size_t rbuf_len)
 {
+    // FIXME: maybe the i2c_msg flag "I2C_M_IGNORE_NAK: treat NACK from client as ACK" will let us
+    //        treat NACK as success? 
+    //        see https://www.kernel.org/doc/html/v5.14/i2c/i2c-protocol.html#modified-transactions
     return -EPERM;
 }
 
-int i2c_write(int fd, uint8_t* wbuf, size_t wbuf_len)
+int i2c_write(int fd, uint8_t addr, uint8_t* wbuf, size_t wbuf_len)
 {
-    struct i2c_client* client = (struct i2c_client*)( fd );
-    /*struct i2c_adapter* adapter = client->adapter;*/
-    struct i2c_msg messages[1]; // https://github.com/raspberrypi/linux/blob/65495647821026e14223095d1b0124aa3d502dec/include/uapi/linux/i2c.h#L74
+    // https://github.com/raspberrypi/linux/blob/65495647821026e14223095d1b0124aa3d502dec/include/uapi/linux/i2c.h#L74
+    struct i2c_msg messages[1]; 
     
     // write
-    messages[0].addr = client->addr;
+    messages[0].addr  = addr;
     messages[0].flags = 0;
-    messages[0].len = wbuf_len;
-    messages[0].buf = wbuf;
+    messages[0].len   = wbuf_len;
+    messages[0].buf   = wbuf;
 
-    // transfer data
+    struct i2c_rdwr_ioctl_data rdwr;
+    rdwr.msgs = messages;
+    rdwr.nmsgs = 1;
+
+    // transfer messages with repeated START (i.e. this is the `i2c_transfer` function in user API)
     // FIXME what is res? cf. comment https://github.com/raspberrypi/linux/blob/65495647821026e14223095d1b0124aa3d502dec/drivers/i2c/i2c-core-base.c#L2322
-    int res = i2c_transfer( client->adapter, messages, 1 ); // https://github.com/raspberrypi/linux/blob/65495647821026e14223095d1b0124aa3d502dec/include/linux/i2c.h#L130
+    int res = ioctl( fd, I2C_RDWR, &rdwr );
+    
+    if (res < 0) return -EIO; // FIXME!
+    
+    return res;
 }
 
-int i2c_write_some(int fd, uint8_t* wbuf, size_t wbuf_len)
+int i2c_write_some(int fd, uint8_t addr, uint8_t* wbuf, size_t wbuf_len)
 {
+    // FIXME: maybe the i2c_msg flag "I2C_M_IGNORE_NAK: treat NACK from client as ACK" will let us
+    //        treat NACK as success? 
+    //        see https://www.kernel.org/doc/html/v5.14/i2c/i2c-protocol.html#modified-transactions
     return -EPERM;
 }
