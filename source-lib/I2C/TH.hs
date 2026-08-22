@@ -115,17 +115,18 @@ register1 name addr def = do
     where
 
       decInstanceRegister :: Name -> RegisterAddress -> Q Dec
-      decInstanceRegister tname addr = do
+      decInstanceRegister ty addr = do
           let dAddress = funD 'registerAddress $ one $ clause [] (normalB $ litE $ integerL $ fromRegisterAddress addr) []
-              dName = funD 'registerName $ one $ clause [] (normalB $ litE $ stringL $ nameBase tname ) []
+              dName = funD 'registerName $ one $ clause [] (normalB $ litE $ stringL $ nameBase ty ) []
+              dItem = tySynInstD $ tySynEqn Nothing (appT (conT ''RegisterItem) (conT ty)) (conT ''Word8)
               dRead = decFunctionAlias 'regread 'regreadRegister1
               dWrite = decFunctionAlias 'regwrite 'regwriteRegister1
               dModify = decFunctionAlias 'regmodify 'regmodifyRegister1
-          instanceD (cxt []) (appT (conT ''Register) (conT tname)) [dAddress, dName, dRead, dWrite, dModify]
+          instanceD (cxt []) (appT (conT ''Register) (conT ty)) [dAddress, dName, dItem, dRead, dWrite, dModify]
 
       decInstanceShow :: Name -> Q Dec
-      decInstanceShow tname =
-          instanceD (cxt []) (appT (conT ''Show) (conT tname)) $ one $ decFunctionAlias 'Text.Show.show 'showRegister1
+      decInstanceShow ty =
+          instanceD (cxt []) (appT (conT ''Show) (conT ty)) $ one $ decFunctionAlias 'Text.Show.show 'showRegister1
 
 
 
@@ -147,27 +148,27 @@ register1 name addr def = do
 -- 
 register2 :: String -> RegisterAddress -> Word16 -> Q [Dec]
 register2 name addr def = do
-    let name' = mkName name
-    dNewtype <- decNewtype name' ''Word16 []
-    dInstanceRegister <- decInstanceRegister name' addr
-    dInstanceDefault <- decInstanceDefault name' def
-    dInstanceShow <- decInstanceShow name' 
+    let ty = mkName name
+    dNewtype <- decNewtype ty ''Word16 []
+    dInstanceRegister <- decInstanceRegister ty addr
+    dInstanceDefault <- decInstanceDefault ty def
+    dInstanceShow <- decInstanceShow ty 
     pure [dNewtype, dInstanceRegister, dInstanceDefault, dInstanceShow]
     
     where
-
       decInstanceRegister :: Name -> RegisterAddress -> Q Dec
-      decInstanceRegister tname addr = do
+      decInstanceRegister ty addr = do
           let dAddress = funD 'registerAddress $ one $ clause [] (normalB $ litE $ integerL $ fromRegisterAddress addr) []
-              dName = funD 'registerName $ one $ clause [] (normalB $ litE $ stringL $ nameBase tname ) []
+              dName = funD 'registerName $ one $ clause [] (normalB $ litE $ stringL $ nameBase ty ) []
+              dItem = tySynInstD $ tySynEqn Nothing (appT (conT ''RegisterItem) (conT ty)) (conT ''Word16)
               dRead = decFunctionAlias 'regread 'regreadRegister2
               dWrite = decFunctionAlias 'regwrite 'regwriteRegister2
               dModify = decFunctionAlias 'regmodify 'regmodifyRegister2
-          instanceD (cxt []) (appT (conT ''Register) (conT tname)) [dAddress, dName, dRead, dWrite, dModify]
+          instanceD (cxt []) (appT (conT ''Register) (conT ty)) [dAddress, dName, dItem, dRead, dWrite, dModify]
     
       decInstanceShow :: Name -> Q Dec
-      decInstanceShow tname =
-          instanceD (cxt []) (appT (conT ''Show) (conT tname)) $ one $ decFunctionAlias 'Text.Show.show 'showRegister2
+      decInstanceShow ty =
+          instanceD (cxt []) (appT (conT ''Show) (conT ty)) $ one $ decFunctionAlias 'Text.Show.show 'showRegister2
 
 
 -- | declare a (sub)field of a register 
@@ -194,9 +195,6 @@ field ty name bitstr = case bitstrToField bitstr of
             TyConI (NewtypeD _ _ty _ _ (NormalC tycon [(_, ConT _tywrapped)]) _)  <- reify ty
             pure tycon
 
-        -- ix == 3, len == 2 =>
-        -- > getX :: (Integral w, Bits w) => REG -> w
-        -- > getX = \(REG w) -> fromIntegral $ (shiftR w 3) .&. 0b11
         decGet ty tycon (size, ix, len) = do
             let funname = mkFunctionName $ "get" <> name  
                 maskE = LitE $ IntegerL $ mkMaskN len 

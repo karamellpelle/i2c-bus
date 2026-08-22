@@ -1,4 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# OPTIONS_GHC -ddump-splices #-}
 {-# OPTIONS_GHC -Wno-type-defaults #-}
 {-# OPTIONS_GHC -Wno-missing-export-lists #-}
@@ -41,33 +42,6 @@ import Language.Haskell.TH.Lib
 --printQ :: Quasi m => Q a -> m ()
 --printQ ma = pPrint =<< runQ ma
 
-
-$(register2 "TEMP" 0x41 0x0000)
-
-getXTAL_DIV :: (Integral w, Bits w) => TEMP -> w
-getXTAL_DIV = \(TEMP w) -> fromIntegral $ (shiftR w 3) .&. 0b11
-
-setXTAL_DIV :: (Integral w, Bits w) => w -> TEMP -> TEMP
-setXTAL_DIV = \w1 (TEMP w0) -> TEMP $ (w0 .&. complement 0b00011000) .|. shiftL (0b11 .&. fromIntegral w1) 3
-
-getXTAL_EN :: (Integral w, Bits w) => TEMP -> w
-getXTAL_EN = \(TEMP w) -> fromIntegral $ (shiftR w 6) .&. 0b1
-
-setXTAL_EN :: (Integral w, Bits w) => w -> TEMP -> TEMP
-setXTAL_EN = \w1 (TEMP w0) -> TEMP $ (w0 .&. complement 0b01000000) .|. shiftL (0b1 .&. fromIntegral w1) 6
-
-modifyXTAL_EN :: (Integral w, Bits w) => (w -> w) -> TEMP -> TEMP
-modifyXTAL_EN f = \t -> setXTAL_EN (f $ getXTAL_EN t) t
-
-bitsetXTAL_EN :: TEMP -> TEMP
-bitsetXTAL_EN = \(TEMP w) -> TEMP $ setBit w 6
-
-bitclearXTAL_EN :: TEMP -> TEMP
-bitclearXTAL_EN = \(TEMP w) -> TEMP $ clearBit w 6
-
-bittoggleXTAL_EN :: TEMP -> TEMP
-bittoggleXTAL_EN = \(TEMP w) -> TEMP $ complementBit w 6
-
 print16 :: Coercible Word16 a => a -> IO ()
 print16 a = putTextLn $ toText @String $ printf "%016b" $ un @Word16 a
 
@@ -78,8 +52,18 @@ print8' :: Integral a => a -> IO ()
 print8' a = print8 (fromIntegral a :: Word8)
 
 $(register2 "MY_REG" 0x22 0xffdd)
+$(register1 "MY_SMALL" 0x22 0xffdd)
 
 $(field ''MY_REG "MY_FIELD" "00000000000****0")
+
+bitsetENABLE_A :: MY_REG -> MY_REG
+--bitsetENABLE_A = \(MY_REG w) -> MY_REG $ 
+bitsetENABLE_A = under @Word16 (flip setBit 6)
+
+bitclearENABLE_A :: MY_REG -> MY_REG
+bitclearENABLE_A = under @Word16 (flip clearBit 6)
+bittoggleENABLE_A :: MY_REG -> MY_REG
+bittoggleENABLE_A = under @Word16 (flip complementBit 6)
 
 a :: MY_REG
 a = MY_REG 0b0000111100011000

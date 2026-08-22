@@ -18,6 +18,7 @@
 -- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 -- SOFTWARE.
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE TypeFamilies #-}
 module I2C.Register
 (
     Register (..),
@@ -56,6 +57,9 @@ class Register reg where
     -- | human readable name
     registerName :: Text
     registerName = "unknown@" <> (show $ registerAddress @reg)
+
+    -- | type of content
+    type RegisterItem reg
 
     -- | bus functions
     regread   :: (Chip chip, MonadIO m) => Internal.BusDevice chip -> m reg
