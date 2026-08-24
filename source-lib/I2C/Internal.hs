@@ -44,9 +44,30 @@ import I2C.Internal.Empty
 -- BusDevice chip (..)
 -- openChip :: forall chip . (Chip chip) => Text -> IO (BusDevice chip)
 -- closeChip :: forall chip . (Chip chip) => BusDevice chip -> IO ()
--- 
+
+-- |  read a specific amount of bytes determined by 'Storable r'. the reading
+--    can be prefixed by a write of a specific amount of bytes determined by
+--    'Storable w' if and only if 'sizeOf w' is non-zero. it is very
+--    encouraged that the backend implement this as a "repeated START" 
+--    transaction, since that is whole reason for the 'w' parameter.
+--  
+--      * call shall fail if 'w' can't be written fully.
+--      * call shall fail if 'r' can't be read fully
+--
 -- read :: Storable w, Storable r  => BusDevice chip -> w -> IO r
+
+-- |  read an arbitrary amount of bytes until NACK by slave. the reading
+--    can be prefixed by a write of a specific amount of bytes determined by
+--    'Storable w' if and only if 'sizeOf w' is non-zero. it is very
+--    encouraged that the backend implement this as a "repeated START" 
+--    transaction, since that is whole reason for the 'w' parameter.
+--  
+--      * call shall fail if 'w' can't be written fully.
+--      * call can fail if the slave does not NACK after reading a larger number 
+--        of bytes determined by the backend (typically by filling up a buffer).
+--
 -- readSome :: Storable w => BusDevice chip -> w -> IO ByteString
+
 -- write :: Storable w => BusDevice chip -> w -> IO ()
 -- writeSome :: Storable w => BusDevice chip -> w -> IO ()
 

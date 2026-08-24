@@ -36,12 +36,18 @@ import I2C.Chip
 -- 
 
 rawread :: forall chip a m . (Chip chip, Storable a, MonadIO m) => Internal.BusDevice chip -> m a
-rawread busdev = liftIO $
-    Internal.readRaw @chip busdev
+rawread busdev = liftIO $ 
+    Internal.read busdev ()
+    --Internal.readRaw @chip busdev
+
+rawreadSome :: forall chip m . (Chip chip, MonadIO m) => Internal.BusDevice chip -> m ByteString
+rawreadSome busdev = liftIO $
+    Internal.readSome busdev ()
 
 rawwrite :: forall chip a m . (Chip chip, Storable a, MonadIO m)  => Internal.BusDevice chip -> a -> m ()
-rawwrite busdev = \a -> liftIO $
-    Internal.writeRaw @chip busdev a
+rawwrite busdev = \w -> liftIO $
+    Internal.write busdev w
+    --Internal.writeRaw @chip busdev a
 
 rawmodify :: forall chip a m . (Chip chip, Storable a, MonadIO m)  => Internal.BusDevice chip -> (a -> a) -> m a
 rawmodify busdev = \f -> liftIO $ do

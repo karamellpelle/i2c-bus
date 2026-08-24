@@ -39,10 +39,6 @@ language: GHC2024
 
 # build flags
 flags:
-  build-linux:
-      description: Use Linux backend
-      default: true
-      manual: true 
   build-empty:
       description: Use a dummy backend
       default: false
@@ -70,6 +66,11 @@ ghc-options:
     - -Wno-unused-matches
     - -Wno-unused-imports
 
+# these may be overridden below:
+cpp-options:
+  - -DARCH_IS_UNKNOWN 
+  - -DI2C_INTERNAL_EMPTY
+
 default-extensions:
     - NoImplicitPrelude
     - OverloadedStrings
@@ -90,8 +91,7 @@ library:
       - condition: flag(build-empty)
         exposed-modules:
           - I2C.Internal.Empty
-
-      - condition: flag(build-linux)
+      - condition: os(linux) && !flag(build-empty)
         exposed-modules:
           - I2C.Internal.Linux
         dependencies: 
@@ -106,10 +106,16 @@ library:
           - ForeignFunctionInterface
 
 when:
+  - condition: os( linux )
+    cpp-options: -UI2C_INTERNAL_EMPTY -DI2C_INTERNAL_LINUX
   - condition: flag(build-empty)
-    cpp-options: -DI2C_INTERNAL_EMPTY
-  - condition: flag(build-linux)
-    cpp-options: -DI2C_INTERNAL_LINUX
+    cpp-options: -UI2C_INTERNAL_LINUX -DI2C_INTERNAL_EMPTY
+    # see values of 'arch' here: https://hackage-content.haskell.org/package/base-4.22.0.0/docs/System-Info.html#v:arch
+    # TODO: add architectures to big or little endian
+  - condition: arch( aarch64 ) || arch( i386 ) || arch( x86_64 )
+    cpp-options: -UARCH_IS_UNKNOWN -DARCH_IS_LITTLE_ENDIAN
+  #- condition: # 
+  #  cpp-options: -UARCH_IS_UNKNOWN -DARCH_IS_BIG_ENDIAN
 
 tests:
     empty:

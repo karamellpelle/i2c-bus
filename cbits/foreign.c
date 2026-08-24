@@ -30,27 +30,6 @@
 #include <unistd.h>
 #include "foreign.h"
 
-#if 0
---  from https://www.kernel.org/doc/html/latest/i2c/dev-interface.html :
---    > /*
---    >  * Using I2C Write, equivalent of
---    >  * i2c_smbus_write_word_data(file, reg, 0x6543)
---    >  */
---    > buf[0] = reg;
---    > buf[1] = 0x43;
---    > buf[2] = 0x65;
---    > if (write(file, buf, 3) != 3) {
---    >   /* ERROR HANDLING: I2C transaction failed */
---    > }
---    > 
---    > /* Using I2C Read, equivalent of i2c_smbus_read_byte(file) */
---    > if (read(file, buf, 1) != 1) {
---    >   /* ERROR HANDLING: I2C transaction failed */
---    > } else {
---    >   /* buf[0] contains the read byte */
--- > }
-#endif
-
 /*
 readRaw :: forall chip a . (Chip chip, Storable a) => BusDevice chip -> IO a
 readRaw busdev@(BusDevice _id ptr) = do
@@ -123,6 +102,7 @@ int regwrite_raw(int fd, uint8_t* buf, size_t len)
 
 ////////////////////////////////////////////////////////////////////////////////
 // see `i2c_rdwr_ioctl_data` at https://www.kernel.org/doc/html/latest/i2c/dev-interface.html#full-interface-description
+//
 int i2c_read(int fd, uint8_t addr, uint8_t* wbuf, size_t wbuf_len, uint8_t* rbuf, size_t rbuf_len)
 {
     // https://github.com/raspberrypi/linux/blob/65495647821026e14223095d1b0124aa3d502dec/include/uapi/linux/i2c.h#L74
@@ -140,13 +120,23 @@ int i2c_read(int fd, uint8_t addr, uint8_t* wbuf, size_t wbuf_len, uint8_t* rbuf
     messages[1].buf   = rbuf;
 
     struct i2c_rdwr_ioctl_data rdwr;
-    rdwr.msgs = messages;
-    rdwr.nmsgs = 2;
+    
+    // don't write if no data
+    if ( wbuf_len == 0 )
+    {
+        rdwr.msgs = &messages[1];
+        rdwr.nmsgs = 1;
+    }
+    else
+    {
+        rdwr.msgs = messages;
+        rdwr.nmsgs = 2;
+    }
 
-    // transfer messages with repeated START (i.e. this is the `i2c_transfer` function in user API)
-    // FIXME what is res? cf. comment https://github.com/raspberrypi/linux/blob/65495647821026e14223095d1b0124aa3d502dec/drivers/i2c/i2c-core-base.c#L2322
+    // transfer messages with repeated START (i.e. this is the kernel `i2c_transfer` function but in user API)
     int res = ioctl( fd, I2C_RDWR, &rdwr );
     
+    // FIXME what is res? cf. comment https://github.com/raspberrypi/linux/blob/65495647821026e14223095d1b0124aa3d502dec/drivers/i2c/i2c-core-base.c#L2322
     if (res < 0) return -EIO; // FIXME!
     
     return res;

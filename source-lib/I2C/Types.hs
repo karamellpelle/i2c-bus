@@ -17,6 +17,7 @@
 -- LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 -- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 -- SOFTWARE.
+{-# LANGUAGE CPP #-}
 module I2C.Types
 (
     ChipAddress (..),
@@ -24,13 +25,27 @@ module I2C.Types
 
     RegisterAddress (..),
     fromRegisterAddress,
-
+    
+    LE16,
+    LE32,
+    LE64,
+    makeLE16,
+    makeLE32,
+    makeLE64,
+    BE16,
+    BE32,
+    BE64,
+    makeBE16,
+    makeBE32,
+    makeBE64,
 ) where
 
 import Relude
 import Text.Show qualified
 
 import Numeric (showHex)
+import Data.Word
+import Foreign.Storable
 import Data.Char (toUpper)
 
 --------------------------------------------------------------------------------
@@ -63,4 +78,73 @@ instance Show RegisterAddress where
 
 fromRegisterAddress :: Num b => RegisterAddress -> b
 fromRegisterAddress (RegisterAddress addr) = fromIntegral addr
+
+
+--------------------------------------------------------------------------------
+--  Little endian Storable
+
+newtype LE16 = LE16 Word16 deriving (Storable)
+
+makeLE16 :: Word16 -> LE16
+makeLE16 = 
+#ifdef ARCH_IS_BIG_ENDIAN
+    LE16 . byteSwap16
+#else
+    LE16
+#endif
+
+newtype LE32 = LE32 Word32 deriving (Storable)
+
+makeLE32 :: Word32 -> LE32
+makeLE32 = 
+#ifdef ARCH_IS_BIG_ENDIAN
+    LE32 . byteSwap32
+#else
+    LE32
+#endif
+
+newtype LE64 = LE64 Word64 deriving (Storable)
+
+makeLE64 :: Word64 -> LE64
+makeLE64 = 
+#ifdef ARCH_IS_BIG_ENDIAN
+    LE64 . byteSwap64
+#else
+    LE64
+#endif
+
+--------------------------------------------------------------------------------
+--  Bin endian Storable
+
+
+newtype BE16 = BE16 Word16 deriving (Storable)
+
+makeBE16 :: Word16 -> BE16
+makeBE16 = 
+#ifdef ARCH_IS_LITTLE_ENDIAN
+    BE16 . byteSwap16
+#else
+    BE16
+#endif
+
+newtype BE32 = BE32 Word32 deriving (Storable)
+
+makeBE32 :: Word32 -> BE32
+makeBE32 = 
+#ifdef ARCH_IS_LITTLE_ENDIAN
+    BE32 . byteSwap32
+#else
+    BE32
+#endif
+
+newtype BE64 = BE64 Word64 deriving (Storable)
+
+makeBE64 :: Word64 -> BE64
+makeBE64 = 
+#ifdef ARCH_IS_LITTLE_ENDIAN
+    BE64 . byteSwap64
+#else
+    BE64
+#endif
+
 

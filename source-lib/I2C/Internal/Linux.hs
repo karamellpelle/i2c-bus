@@ -114,6 +114,9 @@ ptrI2C_ClientToFd =
     fromIntegral . ptrToIntPtr 
 
 
+--------------------------------------------------------------------------------
+--  minimal API
+
 read :: forall chip w r . (Chip chip, Storable w, Storable r)  => 
         BusDevice chip -> w -> IO r
 read busdev@(BusDevice _id ptr) = \w -> do
@@ -140,22 +143,6 @@ write busdev@(BusDevice _id ptr) = \w -> do
 writeSome :: forall chip w r . (Chip chip, Storable w) => 
              BusDevice chip -> w -> IO ()
 writeSome = undefined
-
--- | int i2c_read(int fd, uint8_t addr, uint8_t* wbuf, size_t wbuf_len, uint8_t* rbuf, size_t rbuf_len);
-foreign import ccall safe "foreign.h i2c_read" c_i2c_read
-    :: Ptr I2C_Client -> Word8 -> Ptr Word8 -> CSize -> Ptr Word8 -> CSize -> IO CInt
-
--- | int i2c_read_some(int fd, uint8_t addr, uint8_t* wbuf, size_t wbuf_len, uint8_t* rbuf, size_t rbuf_len);
-foreign import ccall safe "foreign.h i2c_read_some" c_i2c_read_some
-    :: Ptr I2C_Client -> Word8 -> Ptr Word8 -> CSize -> Ptr Word8 -> CSize -> IO CInt
-
--- | int i2c_write(int fd, uint8_t addr, uint8_t* wbuf, size_t wbuf_len);
-foreign import ccall safe "foreign.h i2c_write" c_i2c_write
-    :: Ptr I2C_Client -> Word8 -> Ptr Word8 -> CSize -> IO CInt
-
--- | int i2c_write_some(int fd, uint8_t addr, uint8_t* wbuf, size_t wbuf_len);
-foreign import ccall safe "foreign.h i2c_write_some" c_i2c_write_some
-    :: Ptr I2C_Client -> Word8 -> Ptr Word8 -> CSize -> IO CInt
 
 --------------------------------------------------------------------------------
 --  raw I2C read/write, no registers (SMBus free)
@@ -307,6 +294,27 @@ foreign import ccall safe "sys/ioctl.h ioctl" c_ioctl
     :: CInt -> CULong -> CInt -> IO CInt
 
 
+--------------------------------------------------------------------------------
+--  FFI
+
+-- | int i2c_read(int fd, uint8_t addr, uint8_t* wbuf, size_t wbuf_len, uint8_t* rbuf, size_t rbuf_len);
+foreign import ccall safe "foreign.h i2c_read" c_i2c_read
+    :: Ptr I2C_Client -> Word8 -> Ptr Word8 -> CSize -> Ptr Word8 -> CSize -> IO CInt
+
+-- | int i2c_read_some(int fd, uint8_t addr, uint8_t* wbuf, size_t wbuf_len, uint8_t* rbuf, size_t rbuf_len);
+foreign import ccall safe "foreign.h i2c_read_some" c_i2c_read_some
+    :: Ptr I2C_Client -> Word8 -> Ptr Word8 -> CSize -> Ptr Word8 -> CSize -> IO CInt
+
+-- | int i2c_write(int fd, uint8_t addr, uint8_t* wbuf, size_t wbuf_len);
+foreign import ccall safe "foreign.h i2c_write" c_i2c_write
+    :: Ptr I2C_Client -> Word8 -> Ptr Word8 -> CSize -> IO CInt
+
+-- | int i2c_write_some(int fd, uint8_t addr, uint8_t* wbuf, size_t wbuf_len);
+foreign import ccall safe "foreign.h i2c_write_some" c_i2c_write_some
+    :: Ptr I2C_Client -> Word8 -> Ptr Word8 -> CSize -> IO CInt
+
+
+
 foreign import ccall safe "foreign.h read_raw" c_read_raw
     :: Ptr I2C_Client -> Ptr Word8 -> CSize -> IO CInt
 
@@ -343,11 +351,4 @@ foreign import ccall safe "smbus.h i2c_smbus_read_word_data" c_readWordData
 -- |  s32 i2c_smbus_write_word_data(const struct i2c_client *client, u8 command, u16 value)¶
 foreign import ccall safe "smbus.h i2c_smbus_write_word_data" c_writeWordData
     :: Ptr I2C_Client -> CUChar -> CUShort -> IO CInt
-
--- |  s32 i2c_smbus_read_block_data(const struct i2c_client *client, u8 command, u8 *values)¶
---foreign import ccall safe "smbus.h i2c_smbus_read_block_data" c_readBlockData
---    :: Ptr I2C_Client -> CUChar -> Ptr CUChar -> IO CInt
--- | s32 i2c_smbus_write_block_data(const struct i2c_client *client, u8 command, u8 length, const u8 *values)¶
---foreign import ccall safe "smbus.h i2c_smbus_write_i2c_block_data" c_writeI2CBlockData
---    :: Ptr I2C_Client -> CUChar -> CUChar -> Ptr CUChar -> IO CInt
 
