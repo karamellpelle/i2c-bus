@@ -30,76 +30,6 @@
 #include <unistd.h>
 #include "foreign.h"
 
-/*
-readRaw :: forall chip a . (Chip chip, Storable a) => BusDevice chip -> IO a
-readRaw busdev@(BusDevice _id ptr) = do
-    let len = sizeOf @a undefined
-    allocaArray (fromIntegral len) $ \arr -> do
-        len' <- assertOK (tagErr busdev) $ fmap fromIntegral $ fdReadBuf (ptrI2C_ClientToFd ptr) arr (fromIntegral len)
-        when (len' /= len) $ throwIO $ errI2C eIO $ "read " <> show len' <> " bytes, expected " <> show len
-        (try @IOException $ peek (castPtr arr )) >>= \case
-            Right a -> pure a
-            Left  err -> throwIO $ fromIOException err
-    where
-      tagErr busdev = "readRaw " <> show busdev 
-*/
-int read_raw(int fd, uint8_t* buf, size_t len)
-{
-    if ( read( fd, buf, len ) != len ) return -EIO;
-
-    return 0;
-}
-
-/*
-writeRaw :: forall chip a . (Chip chip, Storable a) => BusDevice chip -> a -> IO ()
-writeRaw busdev@(BusDevice _id ptr) = \a -> do
-    let len = sizeOf a
-    allocaArray (fromIntegral len) $ \arr -> do
-
-        (try @IOException $ poke (castPtr arr) a) >>= \case
-            Right _ -> pure ()
-            Left err -> throwIO $ fromIOException err
-        
-        len' <- assertOK (tagErr busdev) $ fmap fromIntegral $ fdWriteBuf (ptrI2C_ClientToFd ptr) arr (fromIntegral len)
-        when (len' /= len) $ throwIO $ errI2C eIO $ "wrote " <> show len' <> " bytes, expected " <> show len
-    where
-      tagErr busdev = "writeRaw " <> show busdev 
-*/
-
-int write_raw(int fd, const uint8_t* buf, size_t len)
-{
-    if ( write( fd, buf, len ) != len ) return -EIO;
-
-    return 0;
-}
-
-
-
-// we assume that buf is non empty with buf[0] containing register address
-int regread_raw(int fd, uint8_t* buf, size_t len)
-{
-    // FIXME: we should ideally have repeated start condition in order to keep line, 
-    //        especially if there are multiple masters.
-    //        looks like `i2c_transfer` is our function;
-    //        https://www.kernel.org/doc/html//latest/driver-api/i2c.html#c.i2c_transfer
-
-    // write register to tell device which data to read
-    if ( write( fd, buf, 1 ) != 1 ) return -ECOMM;
-    // read data from given register above
-    if ( read( fd, buf, len ) != len ) return -ECOMM;
-
-    return 0;
-}
-
-// we assume that buf is non empty with buf[0] has register written
-int regwrite_raw(int fd, uint8_t* buf, size_t len)
-{
-    // write register + data
-    if ( write( fd, buf, len + 1 ) != len + 1) return -EIO;
-
-    return 0;
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 // see `i2c_rdwr_ioctl_data` at https://www.kernel.org/doc/html/latest/i2c/dev-interface.html#full-interface-description
 //
@@ -136,10 +66,13 @@ int i2c_read(int fd, uint8_t addr, uint8_t* wbuf, size_t wbuf_len, uint8_t* rbuf
     // transfer messages with repeated START (i.e. this is the kernel `i2c_transfer` function but in user API)
     int res = ioctl( fd, I2C_RDWR, &rdwr );
     
-    // FIXME what is res? cf. comment https://github.com/raspberrypi/linux/blob/65495647821026e14223095d1b0124aa3d502dec/drivers/i2c/i2c-core-base.c#L2322
-    if (res < 0) return -EIO; // FIXME!
-    
-    return res;
+    // according to the source for the `i2ctransfer` program, ioctl returns the number of messages sent.
+    // but also see comment https://github.com/raspberrypi/linux/blob/65495647821026e14223095d1b0124aa3d502dec/drivers/i2c/i2c-core-base.c#L2322
+    if ( res < 0 )           return -errno;
+    if ( res != rdwr.nmsgs ) return -EIO;
+   
+    // return number of bytes read
+    return rbuf_len;
 }
 
 int i2c_read_some(int fd, uint8_t addr, uint8_t* wbuf, size_t wbuf_len, uint8_t* rbuf, size_t rbuf_len)
@@ -147,6 +80,7 @@ int i2c_read_some(int fd, uint8_t addr, uint8_t* wbuf, size_t wbuf_len, uint8_t*
     // FIXME: maybe the i2c_msg flag "I2C_M_IGNORE_NAK: treat NACK from client as ACK" will let us
     //        treat NACK as success? 
     //        see https://www.kernel.org/doc/html/v5.14/i2c/i2c-protocol.html#modified-transactions
+    // TODO: compare how the `i2ctransfer` program does this: https://www.kernel.org/pub/software/utils/i2c-tools/
     return -EPERM;
 }
 
@@ -166,12 +100,14 @@ int i2c_write(int fd, uint8_t addr, uint8_t* wbuf, size_t wbuf_len)
     rdwr.nmsgs = 1;
 
     // transfer messages with repeated START (i.e. this is the `i2c_transfer` function in user API)
-    // FIXME what is res? cf. comment https://github.com/raspberrypi/linux/blob/65495647821026e14223095d1b0124aa3d502dec/drivers/i2c/i2c-core-base.c#L2322
     int res = ioctl( fd, I2C_RDWR, &rdwr );
     
-    if (res < 0) return -EIO; // FIXME!
+    // according to the source for the `i2ctransfer` program, ioctl returns the number of messages sent.
+    // but also see comment https://github.com/raspberrypi/linux/blob/65495647821026e14223095d1b0124aa3d502dec/drivers/i2c/i2c-core-base.c#L2322
+    if ( res < 0 )           return -errno;
+    if ( res != rdwr.nmsgs ) return -EIO;
     
-    return res;
+    return wbuf_len;
 }
 
 int i2c_write_some(int fd, uint8_t addr, uint8_t* wbuf, size_t wbuf_len)
@@ -181,3 +117,47 @@ int i2c_write_some(int fd, uint8_t addr, uint8_t* wbuf, size_t wbuf_len)
     //        see https://www.kernel.org/doc/html/v5.14/i2c/i2c-protocol.html#modified-transactions
     return -EPERM;
 }
+
+
+////////////////////////////////////////////////////////////////////////////////
+//  LEGACY. TODO: remove
+
+int read_raw(int fd, uint8_t* buf, size_t len)
+{
+    if ( read( fd, buf, len ) != len ) return -EIO;
+
+    return 0;
+}
+
+int write_raw(int fd, const uint8_t* buf, size_t len)
+{
+    if ( write( fd, buf, len ) != len ) return -EIO;
+
+    return 0;
+}
+
+// we assume that buf is non empty with buf[0] containing register address
+int regread_raw(int fd, uint8_t* buf, size_t len)
+{
+    // FIXME: we should ideally have repeated start condition in order to keep line, 
+    //        especially if there are multiple masters.
+    //        looks like `i2c_transfer` is our function;
+    //        https://www.kernel.org/doc/html//latest/driver-api/i2c.html#c.i2c_transfer
+
+    // write register to tell device which data to read
+    if ( write( fd, buf, 1 ) != 1 ) return -ECOMM;
+    // read data from given register above
+    if ( read( fd, buf, len ) != len ) return -ECOMM;
+
+    return 0;
+}
+
+// we assume that buf is non empty with buf[0] has register written
+int regwrite_raw(int fd, uint8_t* buf, size_t len)
+{
+    // write register + data
+    if ( write( fd, buf, len + 1 ) != len + 1) return -EIO;
+
+    return 0;
+}
+

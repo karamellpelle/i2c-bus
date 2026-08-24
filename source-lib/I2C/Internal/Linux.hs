@@ -71,9 +71,6 @@ import I2C.Exception
 -- |  > /* Use this slave address, even if it is already in use by a driver! */
 --    > #define I2C_SLAVE_FORCE	0x0706	
 
-cpp_I2C_SLAVE_FORCE :: CULong
-cpp_I2C_SLAVE_FORCE = 0x0706	
-
 -- | connection to a hardware device on bus
 data BusDevice chip = 
     BusDevice Text (Ptr I2C_Client)
@@ -91,7 +88,7 @@ openChip ident = do
         Left err   -> throwIO $ fromIOException err
         Right fd   -> do
             let addr = chipAddress @chip
-            _ <- assertOK (tagErr ident addr) $ c_ioctl (fromIntegral fd) cpp_I2C_SLAVE_FORCE (fromChipAddress addr)
+            _ <- assertOK (tagErr ident addr) $ c_ioctl (fI fd) cpp_I2C_SLAVE_FORCE (fromChipAddress addr)
             pure $ BusDevice @chip ident $ fdToPtrI2C_Client fd
     where
       fromIdentifier = toString
@@ -117,24 +114,53 @@ ptrI2C_ClientToFd =
 --------------------------------------------------------------------------------
 --  minimal API
 
+-- |  read a specific amount of bytes determined by 'Storable r'. the reading
+--    can be prefixed by a write of a specific amount of bytes determined by
+--    'Storable w' if and only if 'sizeOf w' is non-zero. it is very
+--    encouraged that the backend implement this as a "repeated START" 
+--    transaction, since that is whole reason for the 'w' parameter.
+--  
+--      * call shall fail if 'w' can't be written fully.
+--      * call shall fail if 'r' can't be read fully
+--
 read :: forall chip w r . (Chip chip, Storable w, Storable r)  => 
         BusDevice chip -> w -> IO r
 read busdev@(BusDevice _id ptr) = \w -> do
-    undefined
-    --res <- try @IOException $ allocaArray len $ \arr -> do
-    --    _ <- assertOK (tagErr busdev) $ c_read_raw ptr addr arr (fromIntegral len)
-    --    peek $ castPtr arr
-    --
-    --case res of
-    --    Right a   -> pure a
-    --    Left err  -> throwIO $ fromIOException err
-    --
-    --where
-    --  tagErr busdev = "readRaw " <> show busdev
+    let sizeW = sizeOf w 
+        sizeR = sizeOf (undefined :: r)
+    when (maxTransferSize < (fI $ sizeW + sizeR)) $ throwIO $ errI2C eNOMEM $ tagErr busdev
+
+    res <- try @IOException $ allocaBytes @Word8 (sizeW + sizeR) $ \mem -> do
+        let ptrW = plusPtr mem 0
+            ptrR = plusPtr mem sizeW
+        -- set write value
+        poke (castPtr ptrW) w
+        _ <- assertOK (tagErr busdev) $ c_i2c_read ptr (fromChipAddress $ chipAddress @chip) ptrW (fI sizeW) ptrR (fI sizeR)
+
+        peek $ castPtr ptrR
+
+    case res of
+        Right a   -> pure a
+        Left err  -> throwIO $ fromIOException err
+
+    where
+      tagErr busdev = "Internal.read " <> show busdev
     
+
+-- |  read an arbitrary amount of bytes until NACK by slave. the reading
+--    can be prefixed by a write of a specific amount of bytes determined by
+--    'Storable w' if and only if 'sizeOf w' is non-zero. it is very
+--    encouraged that the backend implement this as a "repeated START" 
+--    transaction, since that is whole reason for the 'w' parameter.
+--  
+--      * call shall fail if 'w' can't be written fully.
+--      * call can fail if the slave does not NACK after reading a larger number 
+--        of bytes determined by the backend (typically by filling up a buffer).
+--
 readSome :: forall chip w . (Chip chip, Storable w) => 
             BusDevice chip -> w -> IO ByteString
 readSome = undefined
+
 
 write :: forall chip w . (Chip chip, Storable w) => BusDevice chip -> w -> IO ()
 write busdev@(BusDevice _id ptr) = \w -> do
@@ -143,6 +169,14 @@ write busdev@(BusDevice _id ptr) = \w -> do
 writeSome :: forall chip w r . (Chip chip, Storable w) => 
              BusDevice chip -> w -> IO ()
 writeSome = undefined
+
+
+-- | maximal number of bytes allowed in a transaction. 
+--   for 'read' and 'readSome' the size of the write part is included.
+--   FIXME: find a suitable value that does not segfault the stack with
+--   the call to 'allocaBytesAligned'
+maxTransferSize :: Word
+maxTransferSize = 100     -- 100: 4 bytes read + 96 bytes read
 
 --------------------------------------------------------------------------------
 --  raw I2C read/write, no registers (SMBus free)
@@ -265,6 +299,8 @@ writeRegData2 busdev@(BusDevice _id ptr) regaddr = \w -> do
       tagErr busdev regaddr w = "writeRegData2 " <> show busdev <> " " <> show regaddr <> " := " <> show w
 
 
+fI :: (Integral a, Num b) => a -> b
+fI = fromIntegral
 
 --------------------------------------------------------------------------------
 --  FFI
@@ -277,10 +313,12 @@ writeRegData2 busdev@(BusDevice _id ptr) regaddr = \w -> do
 --  NOTE: smbus defines "byte" as Word8 and "word" as Word16 !
 
 
---data I2C_Adapter
 
 -- | linux communication
 data I2C_Client
+
+--data I2C_Adapter
+
 
 -- | handle negative return value as exception (throw I2CErr)
 assertOK :: Num b => Text -> IO CInt -> IO b
@@ -312,6 +350,14 @@ foreign import ccall safe "foreign.h i2c_write" c_i2c_write
 -- | int i2c_write_some(int fd, uint8_t addr, uint8_t* wbuf, size_t wbuf_len);
 foreign import ccall safe "foreign.h i2c_write_some" c_i2c_write_some
     :: Ptr I2C_Client -> Word8 -> Ptr Word8 -> CSize -> IO CInt
+
+
+
+--------------------------------------------------------------------------------
+--  constants
+
+cpp_I2C_SLAVE_FORCE :: CULong
+cpp_I2C_SLAVE_FORCE = 0x0706
 
 
 
