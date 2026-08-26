@@ -111,6 +111,23 @@ testPCF8575 = do
         rawwrite @PCF8575 @Word16 busdev ix
         threadDelay 400000
 
+-- $(register8 "MY_REG")
+-- $(registerBE16 )
+-- $(registerLE16)
+-- 
+-- $(register ''BE16       "MY_REG" 0x21)
+-- $(register ''GyroData   "GYRO" 0x22)
+
+    
+--newtype MY_REG = MY_REG BE16
+--    deriving (Storable)
+--
+--instance Storable BE16
+--    peek ptr = 
+--        byteSwap16
+--write = write $ BE16
+--read 
+
 --------------------------------------------------------------------------------
 --  MPU6050
 

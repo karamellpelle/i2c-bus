@@ -39,11 +39,19 @@ import I2C.Internal.Linux
 import I2C.Internal.Empty
 #endif
 
+--------------------------------------------------------------------------------
+--  backend API:
 
--- Internal.X API
+
+-- | connection to a hardware device on bus
 -- BusDevice chip (..)
+
+-- | open a connection to chip based on bus identifier.
 -- openChip :: forall chip . (Chip chip) => Text -> IO (BusDevice chip)
 -- closeChip :: forall chip . (Chip chip) => BusDevice chip -> IO ()
+
+-- | close connection to chip
+--closeChip :: forall chip . (Chip chip) => BusDevice chip -> IO ()
 
 -- |  read a specific amount of bytes determined by 'Storable r'. the reading
 --    can be prefixed by a write of a specific amount of bytes determined by
@@ -54,7 +62,7 @@ import I2C.Internal.Empty
 --      * call shall fail if 'w' can't be written fully.
 --      * call shall fail if 'r' can't be read fully
 --
--- read :: Storable w, Storable r  => BusDevice chip -> w -> IO r
+--read :: forall chip w r . (Chip chip, Storable w, Storable r)  => BusDevice chip -> w -> IO r
 
 -- |  read an arbitrary amount of bytes until NACK by slave. the reading
 --    can be prefixed by a write of a specific amount of bytes determined by
@@ -66,7 +74,12 @@ import I2C.Internal.Empty
 --      * call can fail if the slave does not NACK after reading a larger number 
 --        of bytes determined by the backend (typically by filling up a buffer).
 --
--- readSome :: Storable w => BusDevice chip -> w -> IO ByteString
+--readSome :: forall chip w . (Chip chip, Storable w) => BusDevice chip -> w -> IO ByteString
 
--- write :: Storable w => BusDevice chip -> w -> IO ()
--- writeSome :: Storable w => BusDevice chip -> w -> IO ()
+-- |  write a specific amount of bytes determined by 'Storable w'.
+--      * call shall fail if 'w' can't be written fully.
+--write :: forall chip w . (Chip chip, Storable w) => BusDevice chip -> w -> IO ()
+
+-- |  write an arbitrary amount of bytes until NACK by slave. returns the number
+--    of bytes written.
+--writeSome :: forall chip w r . (Chip chip) => BusDevice chip -> ByteString -> IO Word

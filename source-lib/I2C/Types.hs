@@ -70,7 +70,7 @@ fromChipAddress (ChipAddress addr) = fromIntegral addr
 
 -- | register address
 newtype RegisterAddress = RegisterAddress Word8
-    deriving (Num)
+    deriving (Num, Storable)
 
 instance Show RegisterAddress where
     show (RegisterAddress w) =

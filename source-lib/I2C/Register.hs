@@ -29,9 +29,6 @@ module I2C.Register
     regread2,
     regwrite2,
     regmodify2,
-    regreadRaw,
-    regwriteRaw,
-    regmodifyRaw,
 
 ) where
 
@@ -43,7 +40,6 @@ import Foreign
 import I2C.Internal qualified as Internal
 import I2C.Chip
 import I2C.Types
-
 
 
 --------------------------------------------------------------------------------
@@ -73,23 +69,21 @@ class Register reg where
 -- | read 1 raw byte from register at chip
 regread1 :: forall chip m . (Chip chip, MonadIO m) => Internal.BusDevice chip -> RegisterAddress -> m Word8
 regread1 busdev = \raddr -> liftIO $ 
-    --Internal.readRegData1 busdev raddr
-    undefined
+    Internal.read busdev raddr 
          
 -- | write raw byte to register at chip. returns value written
 regwrite1 :: forall chip m . (Chip chip, MonadIO m) => Internal.BusDevice chip -> RegisterAddress -> Word8 -> m ()
 regwrite1 busdev = \addr w -> liftIO $ 
-    --Internal.writeRegData1 busdev addr w 
-    undefined
+    Internal.write busdev $ StorableAB addr w 
 
 -- | modify current raw content of register
 regmodify1 :: forall chip m . (Chip chip, MonadIO m) => Internal.BusDevice chip -> RegisterAddress -> (Word8 -> Word8) -> m Word8
 regmodify1 busdev = \addr f -> liftIO $ do
-    --w <- regread1 @chip busdev addr
-    --let w' = f w
-    --regwrite1 @chip busdev addr w'
-    --pure w'
-    undefined
+    w <- regread1 busdev addr
+    let w' = f w
+    regwrite1 busdev addr w'
+    pure w'
+
 --------------------------------------------------------------------------------
 --  Word16 (register + Word16)
 
@@ -116,25 +110,44 @@ regmodify2 busdev = \addr f -> liftIO $ do
 
 
 
-----------------------------------------------------------------------------------
--- read and write 'Storable a' at register
 
-regreadRaw :: forall chip a m . (Chip chip, Storable a, MonadIO m) => Internal.BusDevice chip -> RegisterAddress -> m a
-regreadRaw busdev addr = liftIO $
-    --Internal.readRegRaw @chip busdev addr 
-    undefined
+-- | read 1 raw byte from register at chip
+regreadStorable :: forall chip a m . (Chip chip, Storable a, MonadIO m) => Internal.BusDevice chip -> RegisterAddress -> m a
+regreadStorable busdev = \raddr -> liftIO $ 
+    Internal.read busdev raddr 
+         
+-- | write raw byte to register at chip. returns value written
+regwriteStorable :: forall chip a m . (Chip chip, Storable a, MonadIO m) => Internal.BusDevice chip -> RegisterAddress -> a -> m ()
+regwriteStorable busdev = \addr w -> liftIO $ 
+    Internal.write busdev $ StorableAB addr w 
 
-regwriteRaw :: forall chip a m . (Chip chip, Storable a, MonadIO m)  => Internal.BusDevice chip -> RegisterAddress -> a -> m ()
-regwriteRaw busdev addr = \a -> liftIO $
-    --Internal.writeRegRaw @chip busdev addr a
-    undefined
+-- | modify current raw content of register
+regmodifyStorable :: forall chip a m . (Chip chip, Storable a, MonadIO m) => Internal.BusDevice chip -> RegisterAddress -> (a -> a) -> m a
+regmodifyStorable busdev = \addr f -> liftIO $ do
+    w <- regreadStorable busdev addr
+    let w' = f w
+    regwriteStorable busdev addr w'
+    pure w'
 
-regmodifyRaw :: forall chip a m . (Chip chip, Storable a, MonadIO m)  => Internal.BusDevice chip -> RegisterAddress -> (a -> a) -> m a
-regmodifyRaw busdev addr = \f -> liftIO $ do
-    --a <- regreadRaw @chip busdev addr
-    --let a' = f a
-    --regwriteRaw @chip busdev addr a'
-    --pure a'
-    undefined
+--------------------------------------------------------------------------------
+--  
+
+-- | a storable representation _on the I2C chip_ of 'a' and 'b'
+data StorableAB a b = 
+    StorableAB !a !b
+
+
+-- NOTE: since this is a I2C chip with "continuous bytes", 
+--       I guess aligment is irrelevant for peek and poke
+instance (Storable a, Storable b) => Storable (StorableAB a b) where
+    sizeOf (StorableAB a b) = sizeOf a + sizeOf b  
+    alignment (StorableAB a b) = lcm (alignment a) (alignment b)
+    peek = \ptr -> do
+        a <- peek $ plusPtr ptr 0
+        b <- peek $ plusPtr ptr $ sizeOf a
+        pure $ StorableAB a b
+    poke = \ptr (StorableAB a b) -> do
+        poke (plusPtr ptr 0) $ a
+        poke (plusPtr ptr $ sizeOf a) $ b
 
 
