@@ -50,7 +50,7 @@ print8' a = print8 (fromIntegral a :: Word8)
 
 print16' :: Integral a => a -> IO ()
 print16' a = print16 (fromIntegral a :: Word16)
-
+{-
 $(register1 "MY_REG8" 0x22 0x83)
 $(register2 "MY_REG16" 0x44 0x1122)
 
@@ -64,7 +64,7 @@ a = MY_REG16 0b0000111100011000
 
 b :: MY_REG8
 b = MY_REG8 0b00000110
-
+-}
 ------------------------------------------------------------------------------
 -- TH helpers
 printQ :: Show a => Q a -> IO ()

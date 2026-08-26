@@ -32,8 +32,6 @@ int i2c_write(int fd, uint8_t addr, uint8_t* wbuf, size_t wbuf_len);
 int i2c_write_some(int fd, uint8_t addr, uint8_t* wbuf, size_t wbuf_len);
 
 // TODO: remove these legacy:
-int read_raw(int fd, uint8_t* buf, size_t len);
-int write_raw(int fd, const uint8_t* buf, size_t len);
 int regread_raw(int fd, uint8_t* buf, size_t len);
 int regwrite_raw(int fd, uint8_t* buf, size_t len);
 #endif

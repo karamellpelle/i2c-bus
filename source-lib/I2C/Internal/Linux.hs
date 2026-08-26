@@ -30,20 +30,17 @@ module I2C.Internal.Linux
     write,
     writeSome,
 
-    readRaw,
-    writeRaw,
-    readRegRaw,
-    writeRegRaw,
-
-
-    readData1,
-    readRegData1,
-    readRegData2,
-    --readDataN,
-    writeData1,
-    writeRegData1,
-    writeRegData2,
-    --writeDataN,
+    --readRegRaw,
+    --writeRegRaw,
+    --
+    --readData1,
+    --readRegData1,
+    --readRegData2,
+    ----readDataN,
+    --writeData1,
+    --writeRegData1,
+    --writeRegData2,
+    ----writeDataN,
 
 ) where
 
@@ -65,9 +62,14 @@ import I2C.Chip
 import I2C.Exception
 
 
+--   interesting settings: https://github.com/raspberrypi/linux/blob/ae4246632be85a9a7290a33b3d6c89c4ffa17d2b/include/uapi/linux/i2c-dev.h
+--    * ioctl(file, I2C_SLAVE, long addr): change slave address
+--    * ioctl(file, I2C_FUNCS, unsigned long *funcs): get functionality
+--    * ioctl(file, I2C_TIMEOUT, unsigned long *funcs): timeout in 10 ms
+--    
+
 --------------------------------------------------------------------------------
 --  connect to hardware device on bus
-
 
 -- | connection to a hardware device on bus
 data BusDevice chip = 
@@ -79,7 +81,7 @@ instance Chip chip => Show (BusDevice chip) where
     show (BusDevice id addr) = "(BusDevice " <> (toString $ chipName @chip) <> " " <> show addr <> "@" <> toString id <> ")"
 
 
--- | opens a connection to chip based on bus identifier
+-- | opens a connection to chip based on bus identifier.
 openChip :: forall chip . (Chip chip) => Text -> IO (BusDevice chip)
 openChip ident = do
     (try @IOException $ openFd (fromIdentifier ident) ReadWrite defaultFileFlags) >>= \case
@@ -91,6 +93,8 @@ openChip ident = do
     where
       fromIdentifier = toString
       tagErr ident addr = "openChip: could not find " <> chipName @chip <> " at " <> show addr <> " on bus " <> show ident
+      fdToPtrI2C_Client = intPtrToPtr . fromIntegral 
+
 
 -- | close connection to chip
 closeChip :: forall chip . (Chip chip) => BusDevice chip -> IO ()
@@ -98,15 +102,8 @@ closeChip (BusDevice _id ptr) = do
     (try @IOException $ closeFd $ ptrI2C_ClientToFd ptr) >>= \case
         Left err  -> throwIO $ fromIOException err
         Right _   -> pure ()
-
-
-fdToPtrI2C_Client :: Fd -> Ptr I2C_Client
-fdToPtrI2C_Client =
-    intPtrToPtr . fromIntegral 
-
-ptrI2C_ClientToFd :: Ptr I2C_Client -> Fd
-ptrI2C_ClientToFd =
-    fromIntegral . ptrToIntPtr 
+    where
+      ptrI2C_ClientToFd = fromIntegral . ptrToIntPtr 
 
 
 --------------------------------------------------------------------------------
@@ -194,42 +191,12 @@ writeSome busdev = \bs ->
 maxTransferSize :: Word
 maxTransferSize = 100     -- 100: 4 bytes read + 96 bytes read
 
+{-
 --------------------------------------------------------------------------------
 --  raw I2C read/write, no registers (SMBus free)
 --  according to doc of `allocaBytes`, the call to `allocaArray` should free memory if exception
-
--- |  read data in BusDevice
 --  FIXME: do we need some alignment restrictions on 'a'? cf. docs for `Storable.alignment|peek`
 --          however, 'allocaBytesAligned' perform this check
-readRaw :: forall chip a . (Chip chip, Storable a) => BusDevice chip -> IO a
-readRaw busdev@(BusDevice _id ptr) = do
-    let len = sizeOf @a undefined
-    res <- try @IOException $ allocaArray len $ \arr -> do
-        _ <- assertOK (tagErr busdev) $ c_read_raw ptr arr (fromIntegral len)
-        peek $ castPtr arr
-
-    case res of
-        Right a   -> pure a
-        Left err  -> throwIO $ fromIOException err
-
-    where
-      tagErr busdev = "readRaw " <> show busdev
-
-writeRaw :: forall chip a . (Chip chip, Storable a) => BusDevice chip -> a -> IO ()
-writeRaw busdev@(BusDevice _id ptr) = \a -> do
-    let len = sizeOf a
-    res <- try @IOException $ allocaArray len $ \arr -> do
-        --  
-        poke (castPtr arr) a
-        _ <- assertOK (tagErr busdev) $ c_write_raw ptr arr (fromIntegral len)
-        pure ()
-
-    case res of
-        Right _   -> pure ()
-        Left err  -> throwIO $ fromIOException err
-    where
-      tagErr busdev = "writeRaw " <> show busdev
-
 
 readRegRaw :: forall chip a . (Chip chip, Storable a) => BusDevice chip -> RegisterAddress -> IO a
 readRegRaw busdev@(BusDevice _id ptr) raddr = do
@@ -263,6 +230,7 @@ writeRegRaw busdev@(BusDevice _id ptr) raddr = \a -> do
         Left  err -> throwIO $ fromIOException err
     where
       tagErr busdev = "readRegRaw " <> show busdev 
+
 
 --------------------------------------------------------------------------------
 -- read/write without register (smbus-command)
@@ -313,10 +281,11 @@ writeRegData2 busdev@(BusDevice _id ptr) regaddr = \w -> do
     pure ()
     where
       tagErr busdev regaddr w = "writeRegData2 " <> show busdev <> " " <> show regaddr <> " := " <> show w
-
+-}
 
 fI :: (Integral a, Num b) => a -> b
 fI = fromIntegral
+
 
 --------------------------------------------------------------------------------
 --  FFI
@@ -329,13 +298,6 @@ fI = fromIntegral
 --  NOTE: smbus defines "byte" as Word8 and "word" as Word16 !
 
 
-
--- | linux communication
-data I2C_Client
-
---data I2C_Adapter
-
-
 -- | handle negative return value as exception (throw I2CErr)
 assertOK :: Num b => Text -> IO CInt -> IO b
 assertOK str ma = do
@@ -343,13 +305,19 @@ assertOK str ma = do
     if res < 0 then throwIO $ errI2C (Errno $ negate res) str
                else pure $ fromIntegral res
                   
+--------------------------------------------------------------------------------
+--  FFI
+
+
+-- | linux communication
+data I2C_Client
+
+--data I2C_Adapter
+
+
 -- | int ioctl(int d, int request, ...)
 foreign import ccall safe "sys/ioctl.h ioctl" c_ioctl
     :: CInt -> CULong -> CInt -> IO CInt
-
-
---------------------------------------------------------------------------------
---  FFI
 
 -- | int i2c_read(int fd, uint8_t addr, uint8_t* wbuf, size_t wbuf_len, uint8_t* rbuf, size_t rbuf_len);
 foreign import ccall safe "foreign.h i2c_read" c_i2c_read
@@ -378,13 +346,7 @@ cpp_I2C_SLAVE_FORCE :: CULong
 cpp_I2C_SLAVE_FORCE = 0x0706
 
 
-
-foreign import ccall safe "foreign.h read_raw" c_read_raw
-    :: Ptr I2C_Client -> Ptr Word8 -> CSize -> IO CInt
-
-foreign import ccall safe "foreign.h write_raw" c_write_raw
-    :: Ptr I2C_Client -> Ptr Word8 -> CSize -> IO CInt
-
+{-
 foreign import ccall safe "foreign.h regread_raw" c_regread_raw
     :: Ptr I2C_Client -> Ptr Word8 -> CSize -> IO CInt
 
@@ -415,4 +377,4 @@ foreign import ccall safe "smbus.h i2c_smbus_read_word_data" c_readWordData
 -- |  s32 i2c_smbus_write_word_data(const struct i2c_client *client, u8 command, u16 value)¶
 foreign import ccall safe "smbus.h i2c_smbus_write_word_data" c_writeWordData
     :: Ptr I2C_Client -> CUChar -> CUShort -> IO CInt
-
+-}
