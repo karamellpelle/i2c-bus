@@ -95,7 +95,6 @@ testDummy = do
     pPrint $ "Default REG_WORD16: " <> show (def :: REG_WORD16)
 -}
 
-{-
 --------------------------------------------------------------------------------
 --  PCF8575
 
@@ -111,10 +110,6 @@ testPCF8575 = do
     forM_ [0..0x00FF] $ \ix -> do
         rawwrite @PCF8575 @Word16 busdev ix
         threadDelay 400000
-
-$(register1 "CTRL" 0x01 0xa0)
-$(register2 "XTAL" 0x02 0x01)
--}
 
 --------------------------------------------------------------------------------
 --  MPU6050

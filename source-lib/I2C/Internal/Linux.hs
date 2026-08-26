@@ -68,8 +68,6 @@ import I2C.Exception
 --------------------------------------------------------------------------------
 --  connect to hardware device on bus
 
--- |  > /* Use this slave address, even if it is already in use by a driver! */
---    > #define I2C_SLAVE_FORCE	0x0706	
 
 -- | connection to a hardware device on bus
 data BusDevice chip = 
@@ -138,7 +136,6 @@ read busdev@(BusDevice _id ptr) = \w -> do
         _ <- assertOK (tagErr busdev) $ c_i2c_read ptr (fromChipAddress $ chipAddress @chip) ptrW (fI sizeW) ptrR (fI sizeR)
 
         peek $ castPtr ptrR
-
     case res of
         Right a   -> pure a
         Left err  -> throwIO $ fromIOException err
@@ -157,18 +154,37 @@ read busdev@(BusDevice _id ptr) = \w -> do
 --      * call can fail if the slave does not NACK after reading a larger number 
 --        of bytes determined by the backend (typically by filling up a buffer).
 --
-readSome :: forall chip w . (Chip chip, Storable w) => 
-            BusDevice chip -> w -> IO ByteString
-readSome = undefined
+readSome :: forall chip w . (Chip chip, Storable w) => BusDevice chip -> w -> IO ByteString
+readSome busdev = \w ->
+    throwIO $ errI2C eNOSYS "readSome not implemented on Linux"
 
-
+-- |  write a specific amount of bytes determined by 'Storable w'.
+--      * call shall fail if 'w' can't be written fully.
 write :: forall chip w . (Chip chip, Storable w) => BusDevice chip -> w -> IO ()
 write busdev@(BusDevice _id ptr) = \w -> do
-    undefined
+    let sizeW = sizeOf w 
+    when (maxTransferSize < (fI sizeW)) $ throwIO $ errI2C eNOMEM $ tagErr busdev
+
+    res <- try @IOException $ allocaBytes @Word8 sizeW $ \mem -> do
+        poke (castPtr mem) w
+        _ <- assertOK (tagErr busdev) $ c_i2c_write ptr (fromChipAddress $ chipAddress @chip) mem (fI sizeW)
+        pure ()
+    case res of
+        Right a   -> pure a
+        Left err  -> throwIO $ fromIOException err
+    where
+      tagErr busdev = "Internal.write " <> show busdev
     
-writeSome :: forall chip w r . (Chip chip, Storable w) => 
-             BusDevice chip -> w -> IO ()
-writeSome = undefined
+    
+
+-- |  write an arbitrary amount of bytes until NACK by slave. returns the number
+--    of bytes written.
+--      * call shall fail if 'w' can't be written fully.
+--      * call can fail if the slave does not NACK after reading a larger number 
+--        of bytes determined by the backend (typically by filling up a buffer).
+writeSome :: forall chip w r . (Chip chip) => BusDevice chip -> ByteString -> IO Word
+writeSome busdev = \bs ->
+    throwIO $ errI2C eNOSYS "writeSome not implemented on Linux"
 
 
 -- | maximal number of bytes allowed in a transaction. 
@@ -356,6 +372,8 @@ foreign import ccall safe "foreign.h i2c_write_some" c_i2c_write_some
 --------------------------------------------------------------------------------
 --  constants
 
+-- |  > /* Use this slave address, even if it is already in use by a driver! */
+--    > #define I2C_SLAVE_FORCE	0x0706	
 cpp_I2C_SLAVE_FORCE :: CULong
 cpp_I2C_SLAVE_FORCE = 0x0706
 
