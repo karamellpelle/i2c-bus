@@ -13,7 +13,7 @@
 -- THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 -- IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 -- FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
--- AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+-- AUTHORS OR COPYRIGHT HOLDERS BE LIABStoreLE FOR ANY CLAIM, DAMAGES OR OTHER
 -- LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 -- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 -- SOFTWARE.
@@ -26,26 +26,22 @@ module I2C.Types
     RegisterAddress (..),
     fromRegisterAddress,
     
-    LE16,
-    LE32,
-    LE64,
-    makeLE16,
-    makeLE32,
-    makeLE64,
-    BE16,
-    BE32,
-    BE64,
-    makeBE16,
-    makeBE32,
-    makeBE64,
+    StoreLE16 (..),
+    StoreLE32 (..),
+    StoreLE64 (..),
+    StoreBE16 (..),
+    StoreBE32 (..),
+    StoreBE64 (..),
+    StorableAB (..),
 ) where
 
 import Relude
+import Relude.Extra.Newtype
 import Text.Show qualified
 
 import Numeric (showHex)
 import Data.Word
-import Foreign.Storable
+import Foreign
 import Data.Char (toUpper)
 
 --------------------------------------------------------------------------------
@@ -83,68 +79,109 @@ fromRegisterAddress (RegisterAddress addr) = fromIntegral addr
 --------------------------------------------------------------------------------
 --  Little endian Storable
 
-newtype LE16 = LE16 Word16 deriving (Storable)
+newtype StoreLE16 = StoreLE16 Word16
 
-makeLE16 :: Word16 -> LE16
-makeLE16 = 
+instance Storable StoreLE16 where
+    sizeOf w = sizeOf $ un @Word16 w
+    alignment w = alignment $ un @Word16 w
 #ifdef ARCH_IS_BIG_ENDIAN
-    LE16 . byteSwap16
+    peek = \ptr -> fmap (wrap . byteSwap16) $ peek @Word16 $ castPtr ptr
+    poke = \ptr w -> poke (castPtr ptr) $ byteSwap16 $ un @Word16 w
 #else
-    LE16
+    peek = \ptr -> fmap wrap $ peek @Word16 $ castPtr ptr
+    poke = \ptr w -> poke (castPtr ptr) $ un @Word16 w
 #endif
 
-newtype LE32 = LE32 Word32 deriving (Storable)
+newtype StoreLE32 = StoreLE32 Word32
 
-makeLE32 :: Word32 -> LE32
-makeLE32 = 
+instance Storable StoreLE32 where
+    sizeOf w = sizeOf $ un @Word32 w
+    alignment w = alignment $ un @Word32 w
 #ifdef ARCH_IS_BIG_ENDIAN
-    LE32 . byteSwap32
+    peek = \ptr -> fmap (wrap . byteSwap32) $ peek @Word32 $ castPtr ptr
+    poke = \ptr w -> poke (castPtr ptr) $ byteSwap32 $ un @Word32 w
 #else
-    LE32
+    peek = \ptr -> fmap wrap $ peek @Word32 $ castPtr ptr
+    poke = \ptr w -> poke (castPtr ptr) $ un @Word32 w
 #endif
 
-newtype LE64 = LE64 Word64 deriving (Storable)
 
-makeLE64 :: Word64 -> LE64
-makeLE64 = 
+newtype StoreLE64 = StoreLE64 Word64
+
+instance Storable StoreLE64 where
+    sizeOf w = sizeOf $ un @Word64 w
+    alignment w = alignment $ un @Word64 w
 #ifdef ARCH_IS_BIG_ENDIAN
-    LE64 . byteSwap64
+    peek = \ptr -> fmap (wrap . byteSwap64) $ peek @Word64 $ castPtr ptr
+    poke = \ptr w -> poke (castPtr ptr) $ byteSwap64 $ un @Word64 w
 #else
-    LE64
+    peek = \ptr -> fmap wrap $ peek @Word64 $ castPtr ptr
+    poke = \ptr w -> poke (castPtr ptr) $ un @Word64 w
 #endif
 
 --------------------------------------------------------------------------------
 --  Bin endian Storable
 
+newtype StoreBE16 = StoreBE16 Word16
 
-newtype BE16 = BE16 Word16 deriving (Storable)
-
-makeBE16 :: Word16 -> BE16
-makeBE16 = 
+instance Storable StoreBE16 where
+    sizeOf w = sizeOf $ un @Word16 w
+    alignment w = alignment $ un @Word16 w
 #ifdef ARCH_IS_LITTLE_ENDIAN
-    BE16 . byteSwap16
+    peek = \ptr -> fmap (wrap . byteSwap16) $ peek @Word16 $ castPtr ptr
+    poke = \ptr w -> poke (castPtr ptr) $ byteSwap16 $ un @Word16 w
 #else
-    BE16
+    peek = \ptr -> fmap wrap $ peek @Word16 $ castPtr ptr
+    poke = \ptr w -> poke (castPtr ptr) $ un @Word16 w
 #endif
 
-newtype BE32 = BE32 Word32 deriving (Storable)
+newtype StoreBE32 = StoreBE32 Word32
 
-makeBE32 :: Word32 -> BE32
-makeBE32 = 
+instance Storable StoreBE32 where
+    sizeOf w = sizeOf $ un @Word32 w
+    alignment w = alignment $ un @Word32 w
 #ifdef ARCH_IS_LITTLE_ENDIAN
-    BE32 . byteSwap32
+    peek = \ptr -> fmap (wrap . byteSwap32) $ peek @Word32 $ castPtr ptr
+    poke = \ptr w -> poke (castPtr ptr) $ byteSwap32 $ un @Word32 w
 #else
-    BE32
+    peek = \ptr -> fmap wrap $ peek @Word32 $ castPtr ptr
+    poke = \ptr w -> poke (castPtr ptr) $ un @Word32 w
 #endif
 
-newtype BE64 = BE64 Word64 deriving (Storable)
 
-makeBE64 :: Word64 -> BE64
-makeBE64 = 
+newtype StoreBE64 = StoreBE64 Word64
+
+instance Storable StoreBE64 where
+    sizeOf w = sizeOf $ un @Word64 w
+    alignment w = alignment $ un @Word64 w
 #ifdef ARCH_IS_LITTLE_ENDIAN
-    BE64 . byteSwap64
+    peek = \ptr -> fmap (wrap . byteSwap64) $ peek @Word64 $ castPtr ptr
+    poke = \ptr w -> poke (castPtr ptr) $ byteSwap64 $ un @Word64 w
 #else
-    BE64
+    peek = \ptr -> fmap wrap $ peek @Word64 $ castPtr ptr
+    poke = \ptr w -> poke (castPtr ptr) $ un @Word64 w
 #endif
+
+
+--------------------------------------------------------------------------------
+--  Storable pair
+
+-- | a storable representation _on the I2C chip_ of 'a' and 'b'
+data StorableAB a b = 
+    StorableAB !a !b
+
+
+-- NOTE: since an I2C chip typically uses "continuous bytes", 
+--       I guess aligment is irrelevant for peek and poke below
+instance (Storable a, Storable b) => Storable (StorableAB a b) where
+    sizeOf (StorableAB a b) = sizeOf a + sizeOf b  
+    alignment (StorableAB a b) = lcm (alignment a) (alignment b)
+    peek = \ptr -> do
+        a <- peek $ plusPtr ptr 0
+        b <- peek $ plusPtr ptr $ sizeOf a
+        pure $ StorableAB a b
+    poke = \ptr (StorableAB a b) -> do
+        poke (plusPtr ptr 0) $ a
+        poke (plusPtr ptr $ sizeOf a) $ b
 
 
