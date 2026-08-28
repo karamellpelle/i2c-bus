@@ -27,12 +27,12 @@ module I2C.Types
     fromRegisterAddress,
     
     Store8 (..),
-    StoreLE16 (..),
-    StoreLE32 (..),
-    StoreLE64 (..),
-    StoreBE16 (..),
-    StoreBE32 (..),
-    StoreBE64 (..),
+    Store16LE (..),
+    Store32LE (..),
+    Store64LE (..),
+    Store16BE (..),
+    Store32BE (..),
+    Store64BE (..),
     StorableAB (..),
 ) where
 
@@ -83,9 +83,9 @@ fromRegisterAddress (RegisterAddress addr) = fromIntegral addr
 -- consequent behaviour is good for the TH module
 newtype Store8 = Store8 Word8 deriving (Storable)
 
-newtype StoreLE16 = StoreLE16 Word16
+newtype Store16LE = Store16LE Word16
 
-instance Storable StoreLE16 where
+instance Storable Store16LE where
     sizeOf w = sizeOf $ un @Word16 w
     alignment w = alignment $ un @Word16 w
 #ifdef ARCH_IS_BIG_ENDIAN
@@ -96,9 +96,9 @@ instance Storable StoreLE16 where
     poke = \ptr w -> poke (castPtr ptr) $ un @Word16 w
 #endif
 
-newtype StoreLE32 = StoreLE32 Word32
+newtype Store32LE = Store32LE Word32
 
-instance Storable StoreLE32 where
+instance Storable Store32LE where
     sizeOf w = sizeOf $ un @Word32 w
     alignment w = alignment $ un @Word32 w
 #ifdef ARCH_IS_BIG_ENDIAN
@@ -110,9 +110,9 @@ instance Storable StoreLE32 where
 #endif
 
 
-newtype StoreLE64 = StoreLE64 Word64
+newtype Store64LE = Store64LE Word64
 
-instance Storable StoreLE64 where
+instance Storable Store64LE where
     sizeOf w = sizeOf $ un @Word64 w
     alignment w = alignment $ un @Word64 w
 #ifdef ARCH_IS_BIG_ENDIAN
@@ -123,9 +123,9 @@ instance Storable StoreLE64 where
     poke = \ptr w -> poke (castPtr ptr) $ un @Word64 w
 #endif
 
-newtype StoreBE16 = StoreBE16 Word16
+newtype Store16BE = Store16BE Word16
 
-instance Storable StoreBE16 where
+instance Storable Store16BE where
     sizeOf w = sizeOf $ un @Word16 w
     alignment w = alignment $ un @Word16 w
 #ifdef ARCH_IS_LITTLE_ENDIAN
@@ -136,9 +136,9 @@ instance Storable StoreBE16 where
     poke = \ptr w -> poke (castPtr ptr) $ un @Word16 w
 #endif
 
-newtype StoreBE32 = StoreBE32 Word32
+newtype Store32BE = Store32BE Word32
 
-instance Storable StoreBE32 where
+instance Storable Store32BE where
     sizeOf w = sizeOf $ un @Word32 w
     alignment w = alignment $ un @Word32 w
 #ifdef ARCH_IS_LITTLE_ENDIAN
@@ -150,9 +150,9 @@ instance Storable StoreBE32 where
 #endif
 
 
-newtype StoreBE64 = StoreBE64 Word64
+newtype Store64BE = Store64BE Word64
 
-instance Storable StoreBE64 where
+instance Storable Store64BE where
     sizeOf w = sizeOf $ un @Word64 w
     alignment w = alignment $ un @Word64 w
 #ifdef ARCH_IS_LITTLE_ENDIAN
