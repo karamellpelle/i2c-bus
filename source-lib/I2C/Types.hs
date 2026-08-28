@@ -26,6 +26,7 @@ module I2C.Types
     RegisterAddress (..),
     fromRegisterAddress,
     
+    Store8 (..),
     StoreLE16 (..),
     StoreLE32 (..),
     StoreLE64 (..),
@@ -77,7 +78,10 @@ fromRegisterAddress (RegisterAddress addr) = fromIntegral addr
 
 
 --------------------------------------------------------------------------------
---  Little endian Storable
+--  Little and big endian Storable
+
+-- consequent behaviour is good for the TH module
+newtype Store8 = Store8 Word8 deriving (Storable)
 
 newtype StoreLE16 = StoreLE16 Word16
 
@@ -118,9 +122,6 @@ instance Storable StoreLE64 where
     peek = \ptr -> fmap wrap $ peek @Word64 $ castPtr ptr
     poke = \ptr w -> poke (castPtr ptr) $ un @Word64 w
 #endif
-
---------------------------------------------------------------------------------
---  Bin endian Storable
 
 newtype StoreBE16 = StoreBE16 Word16
 
@@ -171,8 +172,6 @@ data StorableAB a b =
     StorableAB !a !b
 
 
--- NOTE: since an I2C chip typically uses "continuous bytes", 
---       I guess aligment is irrelevant for peek and poke below
 instance (Storable a, Storable b) => Storable (StorableAB a b) where
     sizeOf (StorableAB a b) = sizeOf a + sizeOf b  
     alignment (StorableAB a b) = lcm (alignment a) (alignment b)
@@ -183,5 +182,7 @@ instance (Storable a, Storable b) => Storable (StorableAB a b) where
     poke = \ptr (StorableAB a b) -> do
         poke (plusPtr ptr 0) $ a
         poke (plusPtr ptr $ sizeOf a) $ b
+    -- NOTE: since an I2C chip typically uses "continuous bytes", 
+    --       I guess aligment is irrelevant for peek and poke below
 
 

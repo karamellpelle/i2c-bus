@@ -21,11 +21,27 @@ import Data.Char (toUpper)
 import Text.Pretty.Simple
 import Text.Printf
 import Control.Concurrent
-
+import Foreign
 import Language.Haskell.TH
 import Language.Haskell.TH.Syntax
 import Language.Haskell.TH.Lib
 
+newtype MyRegister = MyRegister StoreBE16 deriving (Storable)
+
+instance Register MyRegister where
+    type RegisterItem MyRegister = StoreBE16
+    registerAddress = 0x05
+    registerName = "MyRegister"
+    regread = regreadMyRegister
+    regwrite = regwriteMyRegister
+
+regreadMyRegister :: (Chip chip, Storable reg, (MonadIO m) => BusDevice chip -> m reg
+regreadMyRegister busdev = 
+    liftIO $ read busdev $ registerAddress @reg
+
+regwriteMyRegister :: (Chip chip, Storable reg, MonadIO m) => BusDevice chip -> reg -> m ()
+regwriteMyRegister busdev = \r -> 
+    liftIO $ write busdev $ StorableAB (registerAddress @reg) r
 
 --
 -- * load ghci with linux build:

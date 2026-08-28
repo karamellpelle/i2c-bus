@@ -74,6 +74,7 @@ cpp-options:
 default-extensions:
     - NoImplicitPrelude
     - OverloadedStrings
+    - TypeFamilies
 
 library:
     source-dirs: source-lib

@@ -18,7 +18,6 @@
 -- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 -- SOFTWARE.
 {-# LANGUAGE AllowAmbiguousTypes #-}
-{-# LANGUAGE TypeFamilies #-}
 module I2C.Register
 (
     Register (..),
@@ -59,8 +58,13 @@ class Register reg where
 
     -- | bus functions
     regread   :: (Chip chip, MonadIO m) => Internal.BusDevice chip -> m reg
-    regwrite  :: (Chip chip, Default reg, MonadIO m) => Internal.BusDevice chip -> (reg -> reg) -> m reg
+    regwrite  :: (Chip chip, MonadIO m) => Internal.BusDevice chip -> reg -> m ()
     regmodify :: (Chip chip, MonadIO m) => Internal.BusDevice chip -> (reg -> reg) -> m reg
+    regmodify = \busdev f -> do
+        r <- regread busdev
+        let r' = f r
+        regwrite busdev r'
+        pure r'
 
 
 --------------------------------------------------------------------------------
