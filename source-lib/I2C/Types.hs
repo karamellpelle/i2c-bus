@@ -63,7 +63,7 @@ fromChipAddress (ChipAddress addr) = fromIntegral addr
 
 --------------------------------------------------------------------------------
 --  registers addressing inside chips
---  our registers are always of size 1 byte 
+--  our register addresses are always of size 1 byte 
 
 -- | register address
 newtype RegisterAddress = RegisterAddress Word8
@@ -80,10 +80,9 @@ fromRegisterAddress (RegisterAddress addr) = fromIntegral addr
 --------------------------------------------------------------------------------
 --  Little and big endian Storable
 
--- consequent behaviour is good for the TH module
-newtype Store8 = Store8 Word8 deriving (Storable)
+newtype Store8 = Store8 Word8 deriving (Eq, Bits, Num, Storable)
 
-newtype Store16LE = Store16LE Word16
+newtype Store16LE = Store16LE Word16 deriving (Eq, Bits, Num)
 
 instance Storable Store16LE where
     sizeOf w = sizeOf $ un @Word16 w
@@ -96,7 +95,7 @@ instance Storable Store16LE where
     poke = \ptr w -> poke (castPtr ptr) $ un @Word16 w
 #endif
 
-newtype Store32LE = Store32LE Word32
+newtype Store32LE = Store32LE Word32 deriving (Eq, Bits, Num)
 
 instance Storable Store32LE where
     sizeOf w = sizeOf $ un @Word32 w
@@ -110,7 +109,7 @@ instance Storable Store32LE where
 #endif
 
 
-newtype Store64LE = Store64LE Word64
+newtype Store64LE = Store64LE Word64 deriving (Eq, Bits, Num)
 
 instance Storable Store64LE where
     sizeOf w = sizeOf $ un @Word64 w
@@ -123,7 +122,7 @@ instance Storable Store64LE where
     poke = \ptr w -> poke (castPtr ptr) $ un @Word64 w
 #endif
 
-newtype Store16BE = Store16BE Word16
+newtype Store16BE = Store16BE Word16 deriving (Eq, Bits, Num)
 
 instance Storable Store16BE where
     sizeOf w = sizeOf $ un @Word16 w
@@ -136,7 +135,7 @@ instance Storable Store16BE where
     poke = \ptr w -> poke (castPtr ptr) $ un @Word16 w
 #endif
 
-newtype Store32BE = Store32BE Word32
+newtype Store32BE = Store32BE Word32 deriving (Eq, Bits, Num)
 
 instance Storable Store32BE where
     sizeOf w = sizeOf $ un @Word32 w
@@ -150,7 +149,7 @@ instance Storable Store32BE where
 #endif
 
 
-newtype Store64BE = Store64BE Word64
+newtype Store64BE = Store64BE Word64 deriving (Eq, Bits, Num)
 
 instance Storable Store64BE where
     sizeOf w = sizeOf $ un @Word64 w
@@ -183,6 +182,6 @@ instance (Storable a, Storable b) => Storable (StorableAB a b) where
         poke (plusPtr ptr 0) $ a
         poke (plusPtr ptr $ sizeOf a) $ b
     -- NOTE: since an I2C chip typically uses "continuous bytes", 
-    --       I guess aligment is irrelevant for peek and poke below
+    --       I guess aligment is irrelevant for peek and poke here
 
 

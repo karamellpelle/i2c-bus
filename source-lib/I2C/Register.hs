@@ -22,13 +22,6 @@ module I2C.Register
 (
     Register (..),
 
-    regread1,
-    regwrite1,
-    regmodify1,
-    regread2,
-    regwrite2,
-    regmodify2,
-
 ) where
 
 import Relude
@@ -66,73 +59,4 @@ class Register reg where
         regwrite busdev r'
         pure r'
 
-
---------------------------------------------------------------------------------
---  Word8 (register + Word8)
-
--- | read 1 raw byte from register at chip
-regread1 :: forall chip m . (Chip chip, MonadIO m) => Internal.BusDevice chip -> RegisterAddress -> m Word8
-regread1 busdev = \raddr -> liftIO $ 
-    Internal.read busdev raddr 
-         
--- | write raw byte to register at chip. returns value written
-regwrite1 :: forall chip m . (Chip chip, MonadIO m) => Internal.BusDevice chip -> RegisterAddress -> Word8 -> m ()
-regwrite1 busdev = \addr w -> liftIO $ 
-    Internal.write busdev $ StorableAB addr w 
-
--- | modify current raw content of register
-regmodify1 :: forall chip m . (Chip chip, MonadIO m) => Internal.BusDevice chip -> RegisterAddress -> (Word8 -> Word8) -> m Word8
-regmodify1 busdev = \addr f -> liftIO $ do
-    w <- regread1 busdev addr
-    let w' = f w
-    regwrite1 busdev addr w'
-    pure w'
-
---------------------------------------------------------------------------------
---  Word16 (register + Word16)
-
--- | read 2 raw bytes from register
-regread2 :: forall chip m . (Chip chip, MonadIO m) => Internal.BusDevice chip -> RegisterAddress -> m Word16
-regread2 busdev = \addr -> liftIO $ 
-    --Internal.readRegData2 busdev addr 
-    undefined
-
--- | write 2 raw bytes to register. 
-regwrite2 :: forall chip m . (Chip chip, MonadIO m) => Internal.BusDevice chip -> RegisterAddress -> Word16 -> m ()
-regwrite2 busdev = \addr w -> liftIO $ 
-    --Internal.writeRegData2 busdev addr w 
-    undefined
-
--- | modify current content of register
-regmodify2 :: forall chip m . (Chip chip, MonadIO m) => Internal.BusDevice chip -> RegisterAddress -> (Word16 -> Word16) -> m Word16
-regmodify2 busdev = \addr f -> liftIO $ do
-    --w <- regread2 @chip busdev addr
-    --let w' = f w
-    --regwrite2 busdev addr w'
-    --pure w'
-    undefined
-
-
-
-
--- | read 1 raw byte from register at chip
-regreadStorable :: forall chip a m . (Chip chip, Storable a, MonadIO m) => Internal.BusDevice chip -> RegisterAddress -> m a
-regreadStorable busdev = \raddr -> liftIO $ 
-    Internal.read busdev raddr 
-         
--- | write raw byte to register at chip. returns value written
-regwriteStorable :: forall chip a m . (Chip chip, Storable a, MonadIO m) => Internal.BusDevice chip -> RegisterAddress -> a -> m ()
-regwriteStorable busdev = \addr w -> liftIO $ 
-    Internal.write busdev $ StorableAB addr w 
-
--- | modify current raw content of register
-regmodifyStorable :: forall chip a m . (Chip chip, Storable a, MonadIO m) => Internal.BusDevice chip -> RegisterAddress -> (a -> a) -> m a
-regmodifyStorable busdev = \addr f -> liftIO $ do
-    w <- regreadStorable busdev addr
-    let w' = f w
-    regwriteStorable busdev addr w'
-    pure w'
-
---------------------------------------------------------------------------------
---  
 

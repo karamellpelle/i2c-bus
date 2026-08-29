@@ -1,5 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE DerivingVia #-}
 --{-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -ddump-splices #-}
 {-# OPTIONS_GHC -Wno-type-defaults #-}
@@ -26,23 +27,6 @@ import Language.Haskell.TH
 import Language.Haskell.TH.Syntax
 import Language.Haskell.TH.Lib
 
-newtype MyRegister = MyRegister StoreBE16 deriving (Storable)
-
-instance Register MyRegister where
-    type RegisterItem MyRegister = StoreBE16
-    registerAddress = 0x05
-    registerName = "MyRegister"
-    regread = regreadMyRegister
-    regwrite = regwriteMyRegister
-
-regreadMyRegister :: (Chip chip, Storable reg, (MonadIO m) => BusDevice chip -> m reg
-regreadMyRegister busdev = 
-    liftIO $ read busdev $ registerAddress @reg
-
-regwriteMyRegister :: (Chip chip, Storable reg, MonadIO m) => BusDevice chip -> reg -> m ()
-regwriteMyRegister busdev = \r -> 
-    liftIO $ write busdev $ StorableAB (registerAddress @reg) r
-
 --
 -- * load ghci with linux build:
 --    $ stack ghci --package=pretty-simple  --flag=i2c:-build-empty --flag=i2c:build-linux
@@ -66,9 +50,10 @@ print8' a = print8 (fromIntegral a :: Word8)
 
 print16' :: Integral a => a -> IO ()
 print16' a = print16 (fromIntegral a :: Word16)
+
 {-
-$(register1 "MY_REG8" 0x22 0x83)
-$(register2 "MY_REG16" 0x44 0x1122)
+$(register8 "MY_REG8" 0x22 0x83)
+$(register16LE "MY_REG16" 0x44 0x1122)
 
 $(field ''MY_REG16 "FIELD_A"  "00000000000****0")
 $(field ''MY_REG16 "BIT_B"    "00*0000000000000")
@@ -81,6 +66,7 @@ a = MY_REG16 0b0000111100011000
 b :: MY_REG8
 b = MY_REG8 0b00000110
 -}
+
 ------------------------------------------------------------------------------
 -- TH helpers
 printQ :: Show a => Q a -> IO ()
@@ -127,23 +113,6 @@ testPCF8575 = do
         rawwrite @PCF8575 @Word16 busdev ix
         threadDelay 400000
 
--- $(register8 "MY_REG")
--- $(registerBE16 )
--- $(registerLE16)
--- 
--- $(register ''BE16       "MY_REG" 0x21)
--- $(register ''GyroData   "GYRO" 0x22)
-
-    
---newtype MY_REG = MY_REG BE16
---    deriving (Storable)
---
---instance Storable BE16
---    peek ptr = 
---        byteSwap16
---write = write $ BE16
---read 
-
 --------------------------------------------------------------------------------
 --  MPU6050
 
@@ -155,16 +124,12 @@ testPCF8575 = do
 --  * https://www.invensense.tdk.com/download-resource/rm-mpu-6000a-00-mpu-6000-and-mpu-6050-register-map-and-descriptions
 $(chip "MPU6050" 0x68)
 
-$(register1 "USER_CTRL" 106 0x00)
+$(register8 "USER_CTRL" 106 0x00)
+$(register8 "INT_PIN_CFG" 55 0x00)
+$(register8 "PWR_MGMT_1" 107 0x40)
 
-$(register1 "INT_PIN_CFG" 55 0x00)
-$(register1 "PWR_MGMT_1" 107 0x40)
-
-$(register2 "TEMP" 0x41 0x0000)
-
-$(register2 "GYRO_XOUT" 0x43 0x0000)
-$(register2 "GYRO_YOUT" 0x45 0x0000)
-$(register2 "GYRO_ZOUT" 0x47 0x0000)
+$(register ''Temperature "TEMP" 0x41 0x0000)
+$(register ''Gyro "GYRO" 0x43 0x0000)
 
 testMPU6050 :: IO ()
 testMPU6050 = do
@@ -183,8 +148,8 @@ testMPU6050 = do
       --y <- regread2 busdev 0x45
       --z <- regread2 busdev 0x47
       -- temperature
-      t <- regread2 busdev 0x41
-
+      t <- regread busdev 0x41
+      print @Temperature t
 
       let x' = (fromIntegral x :: Int16)
       let y' = (fromIntegral y :: Int16)

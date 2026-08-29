@@ -21,8 +21,11 @@
 module I2C.TH
 (
   chip,
-  register1,
-  register2,
+
+  register,
+  register8,
+  register16BE,
+  register16LE,
 
   field,
 
@@ -49,9 +52,12 @@ import Language.Haskell.TH.Lib
 
 
 --------------------------------------------------------------------------------
---  create Chips and Registers through Template Haskell 
+--  create Chips and Registers through Template Haskell !
 --------------------------------------------------------------------------------
 
+
+--------------------------------------------------------------------------------
+--  Chip
 
 -- | declare a Chip with name 'name' at _7_ bit bus address 'addr'
 --
@@ -84,93 +90,69 @@ chip name addr = do
           instanceD (cxt []) (appT (conT ''Chip) (conT tname)) [dAddress, dName]
 
 
+--------------------------------------------------------------------------------
+--  Register
+
+regread' :: forall chip reg m . (Chip chip, Register reg, Storable reg, MonadIO m) => BusDevice chip -> m reg
+regread' busdev = 
+    liftIO $ read busdev $ registerAddress @reg
+
+regwrite' :: forall chip reg m . (Chip chip, Register reg, Storable reg, MonadIO m) => BusDevice chip -> reg -> m ()
+regwrite' busdev = \r -> 
+    liftIO $ write busdev $ StorableAB (registerAddress @reg) r
+
+
+-- | declare a register of Chip from Storable type. Storable is 
+--   relative to I2C chip
+register :: Name -> String -> RegisterAddress -> Q [Dec]
+register tywrap name addr = do
+    let ty = mkName name
+    dNewtype <- decNewtype ty tywrap [''Storable]
+    dInstanceRegister <- decInstanceRegister ty addr
+    pure [dNewtype, dInstanceRegister]
+    
+    where
+      decInstanceRegister :: Name -> RegisterAddress -> Q Dec
+      decInstanceRegister ty addr = do
+          let dAddress = funD 'registerAddress $ one $ clause [] (normalB $ litE $ integerL $ fromRegisterAddress addr) []
+              dName = funD 'registerName $ one $ clause [] (normalB $ litE $ stringL $ nameBase ty ) []
+              dItem = tySynInstD $ tySynEqn Nothing (appT (conT ''RegisterItem) (conT ty)) (conT tywrap)
+              dRead = decFunctionAssign 'regread 'regread'
+              dWrite = decFunctionAssign 'regwrite 'regwrite'
+          instanceD (cxt []) (appT (conT ''Register) (conT ty)) [dAddress, dName, dItem, dRead, dWrite]
+    
 
 -- | declare a register of Chip that contains Word8 data
---
--- > $(register1 "REG_SMALL" 0xF0 0x01) =>
--- > 
--- >   newtype REG_SMALL = REG_SMALL Word8
--- >
--- >   instance Register REG_SMALL where
--- >       registerAddress = 0xF0
--- >       registerName = "REG_SMALL"
--- >       regread = regreadRegister1
--- >       regwrite = regwriteRegister1
--- >       regmodify = regmodifyRegister1
--- >
--- >   instance Default REG_SMALL where
--- >       def = REG_SMALL 0x01
--- >
--- >   instance Show REG_SMALL where
--- >       show = showRegister1
--- >
-register1 :: String -> RegisterAddress -> Word8 -> Q [Dec]
-register1 name addr def = do
+register8 :: String -> RegisterAddress -> Word8 -> Q [Dec]
+register8 name addr def = do
     let name' = mkName name
-    dNewtype <- decNewtype name' ''Word8 []
-    dInstanceRegister <- decInstanceRegister name' addr
+    dReg <- register ''Store8 name addr
     dInstanceDefault <- decInstanceDefault name' def
-    dInstanceShow <- decInstanceShow name' 
-    pure [dNewtype, dInstanceRegister, dInstanceDefault, dInstanceShow]
-    
-    where
+    dInstanceShow <- decInstanceShow name' 'showHex8
+    pure $ dReg <> [dInstanceDefault, dInstanceShow]
 
-      decInstanceRegister :: Name -> RegisterAddress -> Q Dec
-      decInstanceRegister ty addr = do
-          let dAddress = funD 'registerAddress $ one $ clause [] (normalB $ litE $ integerL $ fromRegisterAddress addr) []
-              dName = funD 'registerName $ one $ clause [] (normalB $ litE $ stringL $ nameBase ty ) []
-              dItem = tySynInstD $ tySynEqn Nothing (appT (conT ''RegisterItem) (conT ty)) (conT ''Word8)
-              dRead = decFunctionAlias 'regread 'regreadRegister1
-              dWrite = decFunctionAlias 'regwrite 'regwriteRegister1
-              dModify = decFunctionAlias 'regmodify 'regmodifyRegister1
-          instanceD (cxt []) (appT (conT ''Register) (conT ty)) [dAddress, dName, dItem, dRead, dWrite, dModify]
+-- | declare a register of Chip that contains Word16 data as Little Endian
+register16LE :: String -> RegisterAddress -> Word16 -> Q [Dec]
+register16LE name addr def = do
+    let name' = mkName name
+    dReg <- register ''Store16LE name addr
+    dInstanceDefault <- decInstanceDefault name' def
+    dInstanceShow <- decInstanceShow name' 'showHex16
+    pure $ dReg <> [dInstanceDefault, dInstanceShow]
 
-      decInstanceShow :: Name -> Q Dec
-      decInstanceShow ty =
-          instanceD (cxt []) (appT (conT ''Show) (conT ty)) $ one $ decFunctionAlias 'Text.Show.show 'showRegister1
+-- | declare a register of Chip that contains Word16 data as Big Endian
+register16BE :: String -> RegisterAddress -> Word16 -> Q [Dec]
+register16BE name addr def = do
+    let name' = mkName name
+    dReg <- register ''Store16BE name addr
+    dInstanceDefault <- decInstanceDefault name' def
+    dInstanceShow <- decInstanceShow name' 'showHex16
+    pure $ dReg <> [dInstanceDefault, dInstanceShow]
 
 
 
--- | declare a register of Chip that contains Word16
---
--- > $(register1 "REG_LARGE" 0xF0 0x0123) =>
--- > 
--- >   newtype REG_LARGE = REG_LARGE Word8
--- >       deriving (Show)
--- >   instance Register2 REG_LARGE where
--- >       registerAddress = 0xF0
--- >       registerName = "REG_LARGE"
--- >       regread = regread2'
--- >       regwrite = regwrite2'
--- >   instance Default REG_LARGE where
--- >       def = 0x0123
--- >   instance Show REG_LARGE where
--- >       show = showRegister2
--- 
-register2 :: String -> RegisterAddress -> Word16 -> Q [Dec]
-register2 name addr def = do
-    let ty = mkName name
-    dNewtype <- decNewtype ty ''Word16 []
-    dInstanceRegister <- decInstanceRegister ty addr
-    dInstanceDefault <- decInstanceDefault ty def
-    dInstanceShow <- decInstanceShow ty 
-    pure [dNewtype, dInstanceRegister, dInstanceDefault, dInstanceShow]
-    
-    where
-      decInstanceRegister :: Name -> RegisterAddress -> Q Dec
-      decInstanceRegister ty addr = do
-          let dAddress = funD 'registerAddress $ one $ clause [] (normalB $ litE $ integerL $ fromRegisterAddress addr) []
-              dName = funD 'registerName $ one $ clause [] (normalB $ litE $ stringL $ nameBase ty ) []
-              dItem = tySynInstD $ tySynEqn Nothing (appT (conT ''RegisterItem) (conT ty)) (conT ''Word16)
-              dRead = decFunctionAlias 'regread 'regreadRegister2
-              dWrite = decFunctionAlias 'regwrite 'regwriteRegister2
-              dModify = decFunctionAlias 'regmodify 'regmodifyRegister2
-          instanceD (cxt []) (appT (conT ''Register) (conT ty)) [dAddress, dName, dItem, dRead, dWrite, dModify]
-    
-      decInstanceShow :: Name -> Q Dec
-      decInstanceShow ty =
-          instanceD (cxt []) (appT (conT ''Show) (conT ty)) $ one $ decFunctionAlias 'Text.Show.show 'showRegister2
-
+--------------------------------------------------------------------------------
+--  fields
 
 -- | declare a (sub)field of a register 
 --
@@ -258,50 +240,6 @@ mkFunctionName str =
 --    setMY_FIELD = \w1 (MY_REG w0) -> MY_REG $ ((w0 .&. complement 0b0000000000011110) .|. unsafeShiftL (0b0000000000001111 .&. fromIntegral w1) 1)
 --
 
---------------------------------------------------------------------------------
---  helpers for Register instancing
-
-regreadRegister1 :: forall chip reg m . (Chip chip, Register reg, Coercible Word8 reg, MonadIO m) => 
-                    BusDevice chip -> m reg
-regreadRegister1 busdev = 
-    fmap coerce $ regread1 @chip busdev (registerAddress @reg)
-
-regwriteRegister1 :: forall chip reg m . (Chip chip, Register reg, Coercible Word8 reg, Default reg, MonadIO m) => 
-                     BusDevice chip -> (reg -> reg) -> m reg
-regwriteRegister1 busdev = \f -> do
-    let r' = f def
-    regwrite1 @chip busdev (registerAddress @reg) (coerce $ r')
-    pure r'
-
-regmodifyRegister1 :: forall chip reg m . (Chip chip, Register reg, Coercible Word8 reg, MonadIO m) => 
-            BusDevice chip -> (reg -> reg) -> m reg
-regmodifyRegister1 busdev = \f -> do
-    r <- regreadRegister1 busdev
-    let r' = f r
-    regwrite1 busdev (registerAddress @reg) $ coerce $ r'
-    pure r'
-
-     
-regreadRegister2 :: forall chip reg m . (Chip chip, Register reg, Coercible Word16 reg, MonadIO m) => 
-            BusDevice chip -> m reg
-regreadRegister2 busdev =
-    fmap coerce $ regread2 @chip busdev (registerAddress @reg)
-
-regwriteRegister2 :: forall chip reg m . (Chip chip, Register reg, Coercible Word16 reg, Default reg, MonadIO m) => 
-            BusDevice chip -> (reg -> reg) -> m reg
-regwriteRegister2 busdev = \f -> do
-    let r' = f def
-    regwrite2 @chip busdev (registerAddress @reg) $ coerce $ r'
-    pure r'
-
-regmodifyRegister2 :: forall chip reg m . (Chip chip, Register reg, Coercible Word16 reg, MonadIO m) => 
-            BusDevice chip -> (reg -> reg) -> m reg
-regmodifyRegister2 busdev = \f -> do
-    r <- regreadRegister2 busdev
-    let r' = f r
-    regwrite2 busdev (registerAddress @reg) $ coerce $ r'
-    pure r'
-
 
 
 --------------------------------------------------------------------------------
@@ -313,6 +251,9 @@ decInstanceDefault tname v = do
         dDef = funD 'def $ one $ clause [] (normalB $ appE (conE tname) (litE $ integerL $ toInteger v)) []
     instanceD (cxt []) (appT (conT ''Default) (conT tname)) [dDef]
 
+decInstanceShow :: Name -> Name -> Q Dec
+decInstanceShow ty f =
+    instanceD (cxt []) (appT (conT ''Show) (conT ty)) $ one $ decFunctionAssign 'Text.Show.show f
 
 decNewtype :: Name -> Name -> [Name] -> Q Dec
 decNewtype tname tname' tderivs = 
@@ -328,19 +269,9 @@ normalC' tname ts =
       helper :: Type -> BangType
       helper = \tp -> (Bang NoSourceUnpackedness NoSourceStrictness, tp)
 
-decFunctionAlias :: Name -> Name -> Q Dec
-decFunctionAlias a b = 
+decFunctionAssign :: Name -> Name -> Q Dec
+decFunctionAssign a b = 
     funD a $ one $ clause [] (normalB $ varE b) []
-
-showRegister1 :: forall reg . (Register reg, Coercible Word8 reg) => reg -> String
-showRegister1 reg = 
-    (toString $ registerName @reg) <> "(" <> showWord8 (coerce reg) <> ")"
-    --(toString $ registerName @reg) <> "==" <> showWord8 (coerce reg) 
-
-showRegister2 :: forall reg . (Register reg, Coercible Word16 reg) => reg -> String
-showRegister2 reg = 
-    (toString $ registerName @reg) <> "(" <> showWord16 (coerce reg) <> ")"
-    --(toString $ registerName @reg) <> "==" <> showWord16 (coerce reg) 
 
 
 -- | bitstring to (size, index, length). 
@@ -365,16 +296,50 @@ bitstrToField bitstr =
 
 
 --------------------------------------------------------------------------------
---  
+--  shows
 
-showWord8 :: Word8 -> String
-showWord8 = showWordN 2
+showHex8 :: forall reg . (Register reg, Coercible Word8 reg) => reg -> String
+showHex8 reg = 
+    (toString $ registerName @reg) <> "(" <> showWordN 2 (un @Word8 reg) <> ")"
 
-showWord16 :: Word16 -> String
-showWord16 = showWordN 4 
+showHex16 :: forall reg . (Register reg, Coercible Word16 reg) => reg -> String
+showHex16 reg = 
+    (toString $ registerName @reg) <> "(" <> showWordN 4 (un @Word16 reg) <> ")"
+
+showHex32 :: forall reg . (Register reg, Coercible Word32 reg) => reg -> String
+showHex32 reg = 
+    (toString $ registerName @reg) <> "(" <> showWordN 8 (un @Word32 reg) <> ")"
+
+showHex64 :: forall reg . (Register reg, Coercible Word64 reg) => reg -> String
+showHex64 reg = 
+    (toString $ registerName @reg) <> "(" <> showWordN 16 (un @Word64 reg) <> ")"
+
+showBin8 :: forall reg . (Register reg, Coercible Word8 reg) => reg -> String
+showBin8 reg = 
+    (toString $ registerName @reg) <> "(" <> showBinN 8 (un @Word8 reg) <> ")"
+
+showBin16 :: forall reg . (Register reg, Coercible Word16 reg) => reg -> String
+showBin16 reg = 
+    (toString $ registerName @reg) <> "(" <> showBinN 16 (un @Word16 reg) <> ")"
+
+showBin32 :: forall reg . (Register reg, Coercible Word32 reg) => reg -> String
+showBin32 reg = 
+    (toString $ registerName @reg) <> "(" <> showBinN 32 (un @Word32 reg) <> ")"
+
+showBin64 :: forall reg . (Register reg, Coercible Word64 reg) => reg -> String
+showBin64 reg = 
+    (toString $ registerName @reg) <> "(" <> showBinN 64 (un @Word64 reg) <> ")"
+
 
 showWordN :: Integral a => Int -> a -> String
 showWordN n w =
     let str = fmap toUpper $ showHex w ""
         n'  = if length str <= n then n - length str else 0
     in replicate n' '0' <> str
+
+showBinN :: Integral a => Int -> a -> String
+showBinN n w =
+    let str = showBin w ""
+        n'  = if length str <= n then n - length str else 0
+    in replicate n' '0' <> str
+
