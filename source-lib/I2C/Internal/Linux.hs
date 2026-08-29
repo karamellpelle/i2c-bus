@@ -94,6 +94,15 @@ closeChip (BusDevice _id ptr) = do
       ptrI2C_ClientToFd = fromIntegral . ptrToIntPtr 
 
 
+-- | set timeout for transfers
+chipTimeoutMs :: forall chip . (Chip chip) => BusDevice chip -> Word -> IO ()
+chipTimeoutMs busdev@(BusDevice _id ptr) ms = do
+    _ <- assertOK tagErr $ c_ioctl (ptrI2C_ClientToFd ptr) cpp_I2C_TIMEOUT $ fromIntegral $ div ms 10
+    pure ()
+    where
+      tagErr = "chipTimeoutMs: could not set timeout to " <> show ms <> " ms on " <> show busdev
+      ptrI2C_ClientToFd = fromIntegral . ptrToIntPtr 
+
 --------------------------------------------------------------------------------
 --  internal transaction API
 
@@ -216,6 +225,10 @@ data I2C_Client
 cpp_I2C_SLAVE_FORCE :: CULong
 cpp_I2C_SLAVE_FORCE = 0x0706
 
+-- |  > /* set timeout in units of 10 ms */
+--    > #define I2C_TIMEOUT 0x0702	
+cpp_I2C_TIMEOUT :: CULong
+cpp_I2C_TIMEOUT = 0x0702
 
 -- | int ioctl(int d, int request, ...)
 foreign import ccall safe "sys/ioctl.h ioctl" c_ioctl
