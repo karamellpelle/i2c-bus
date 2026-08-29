@@ -51,7 +51,6 @@ print8' a = print8 (fromIntegral a :: Word8)
 print16' :: Integral a => a -> IO ()
 print16' a = print16 (fromIntegral a :: Word16)
 
-{-
 $(register8 "MY_REG8" 0x22 0x83)
 $(register16LE "MY_REG16" 0x44 0x1122)
 
@@ -65,7 +64,17 @@ a = MY_REG16 0b0000111100011000
 
 b :: MY_REG8
 b = MY_REG8 0b00000110
--}
+
+getTEST_F :: Integral n => MY_REG16 -> n ; getTEST_F = \w -> fromIntegral $ unsafeShiftR (un @Store16LE w) 13 .&. 1
+
+--getTEST_F :: Integral n => MY_REG16 -> n
+--getTEST_F = 
+--    -- \(MY_REG16 w) -> (fromIntegral $ (unsafeShiftR w 13 .&. 1))
+--    \w -> fromIntegral $ unsafeShiftR (un @Store16LE w) 13 .&. 1
+
+setTEST_F :: Integral n => n -> MY_REG16 -> MY_REG16
+setTEST_F = -- \n (MY_REG16 w) -> (MY_REG16 $ ((w .&. complement 8192) .|. unsafeShiftL (1 .&. fromIntegral n) 13))
+    \n -> under @Store16LE $ \w -> (w .&. complement 8192) .|. unsafeShiftL (1 .&. fromIntegral n) 13
 
 ------------------------------------------------------------------------------
 -- TH helpers
@@ -73,6 +82,76 @@ printQ :: Show a => Q a -> IO ()
 printQ ma = do
     a <- runQ ma
     pPrint a
+
+--------------------------------------------------------------------------------
+--  PCF8575
+
+-- this is a GPIO expander chip with 2 bytes => 16 pins
+-- (no registers, only write and read 2 bytes)
+--  * https://www.ti.com/lit/ds/symlink/pcf8575.pdf
+$(chip "PCF8575" 0x20)
+
+testPCF8575 :: IO ()
+testPCF8575 = do
+    busdev <- openChip @PCF8575 "/dev/i2c-1"
+    
+    forM_ [0..0x00FF] $ \ix -> do
+        rawwrite @PCF8575 @Word16 busdev ix
+        threadDelay 400000
+
+{-
+--------------------------------------------------------------------------------
+--  MPU6050
+
+-- this is a accelerometer and gyroscope chip with registers
+--  * https://randomnerdtutorials.com/arduino-mpu-6050-accelerometer-gyroscope/
+--  * https://github.com/adafruit/Adafruit_MPU6050/blob/master/Adafruit_MPU6050.cpp
+--  * https://www.invensense.tdk.com/en-us/download-resource/ps-mpu-6000a-00-mpu-6000-and-mpu-6050-datasheet
+--  * https://www.invensense.tdk.com/download-resource/rm-mpu-6000a-00-mpu-6000-and-mpu-6050-register-map-and-descriptions
+$(chip "MPU6050" 0x68)
+
+$(register8 "USER_CTRL" 106 0x00)
+$(register8 "INT_PIN_CFG" 55 0x00)
+$(register8 "PWR_MGMT_1" 107 0x40)
+
+-- $(register ''Temperature "TEMP" 0x41 0x0000)
+-- $(register ''Gyro "GYRO" 0x43 0x0000)
+
+testMPU6050 :: IO ()
+testMPU6050 = do
+    busdev <- openChip @MPU6050 "/dev/i2c-1"
+
+    regwrite busdev 0x6A $ 0b00000111
+    regwrite busdev 0x6B $ 0b00000010 -- disable sleep and set PLL from Y axis gyroscope reference
+-}
+{-
+    forever $ do
+        -- acceleration:
+        x <- regread2 busdev 0x3B
+        y <- regread2 busdev 0x3D
+        z <- regread2 busdev 0x3F
+        -- gyroscope
+        --x <- regread2 busdev 0x43
+        --y <- regread2 busdev 0x45
+        --z <- regread2 busdev 0x47
+        -- temperature
+        t <- regread busdev 0x41
+        print @Temperature t
+
+        let x' = (fromIntegral x :: Int16)
+        let y' = (fromIntegral y :: Int16)
+        let z' = (fromIntegral z :: Int16)
+        putTextLn $ toText @String $ printf "X: %+ 6d Y: %+ 6d Z: %+ 6d" x' y' z'
+        --putTextLn $ toText @String $ printf "X: %04X Y: %04X Z: %04X, temp: %04X" x y z t
+
+        let t' = (fromIntegral @Int16 @Double (fromIntegral @Word16 @Int16 t) / 340.0 + 36.53) 
+        putTextLn $ toText @String $ printf "T: %+ 3.1f " t'
+
+        putTextLn ""
+
+        -- ^ output doesn't look right, maybe the register setups are wrong :)
+        threadDelay 400000
+-}
 
 --------------------------------------------------------------------------------
 --  dummy
@@ -97,71 +176,3 @@ testDummy = do
     pPrint $ "Default REG_WORD16: " <> show (def :: REG_WORD16)
 -}
 
---------------------------------------------------------------------------------
---  PCF8575
-
--- this is a GPIO expander chip with 2 bytes => 16 pins
--- (no registers, only write and read 2 bytes)
---  * https://www.ti.com/lit/ds/symlink/pcf8575.pdf
-$(chip "PCF8575" 0x20)
-
-testPCF8575 :: IO ()
-testPCF8575 = do
-    busdev <- openChip @PCF8575 "/dev/i2c-1"
-    
-    forM_ [0..0x00FF] $ \ix -> do
-        rawwrite @PCF8575 @Word16 busdev ix
-        threadDelay 400000
-
---------------------------------------------------------------------------------
---  MPU6050
-
-{-
--- this is a accelerometer and gyroscope chip with registers
---  * https://randomnerdtutorials.com/arduino-mpu-6050-accelerometer-gyroscope/
---  * https://github.com/adafruit/Adafruit_MPU6050/blob/master/Adafruit_MPU6050.cpp
---  * https://www.invensense.tdk.com/en-us/download-resource/ps-mpu-6000a-00-mpu-6000-and-mpu-6050-datasheet
---  * https://www.invensense.tdk.com/download-resource/rm-mpu-6000a-00-mpu-6000-and-mpu-6050-register-map-and-descriptions
-$(chip "MPU6050" 0x68)
-
-$(register8 "USER_CTRL" 106 0x00)
-$(register8 "INT_PIN_CFG" 55 0x00)
-$(register8 "PWR_MGMT_1" 107 0x40)
-
-$(register ''Temperature "TEMP" 0x41 0x0000)
-$(register ''Gyro "GYRO" 0x43 0x0000)
-
-testMPU6050 :: IO ()
-testMPU6050 = do
-  busdev <- openChip @MPU6050 "/dev/i2c-1"
-
-  regwrite1 busdev 0x6A $ 0b00000111
-  regwrite1 busdev 0x6B $ 0b00000010 -- disable sleep and set PLL from Y axis gyroscope reference
-
-  forever $ do
-      -- acceleration:
-      x <- regread2 busdev 0x3B
-      y <- regread2 busdev 0x3D
-      z <- regread2 busdev 0x3F
-      -- gyroscope
-      --x <- regread2 busdev 0x43
-      --y <- regread2 busdev 0x45
-      --z <- regread2 busdev 0x47
-      -- temperature
-      t <- regread busdev 0x41
-      print @Temperature t
-
-      let x' = (fromIntegral x :: Int16)
-      let y' = (fromIntegral y :: Int16)
-      let z' = (fromIntegral z :: Int16)
-      putTextLn $ toText @String $ printf "X: %+ 6d Y: %+ 6d Z: %+ 6d" x' y' z'
-      --putTextLn $ toText @String $ printf "X: %04X Y: %04X Z: %04X, temp: %04X" x y z t
-
-      let t' = (fromIntegral @Int16 @Double (fromIntegral @Word16 @Int16 t) / 340.0 + 36.53) 
-      putTextLn $ toText @String $ printf "T: %+ 3.1f " t'
-
-      putTextLn ""
-
-      -- ^ output doesn't look right, maybe the register setups are wrong :)
-      threadDelay 400000
--}

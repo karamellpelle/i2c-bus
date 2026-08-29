@@ -80,9 +80,11 @@ fromRegisterAddress (RegisterAddress addr) = fromIntegral addr
 --------------------------------------------------------------------------------
 --  Little and big endian Storable
 
-newtype Store8 = Store8 Word8 deriving (Eq, Bits, Num, Storable)
+newtype Store8 = Store8 Word8 
+    deriving (Eq, Bits, Num, Integral, Enum, Real, Ord, Storable)
 
-newtype Store16LE = Store16LE Word16 deriving (Eq, Bits, Num)
+newtype Store16LE = Store16LE Word16 
+    deriving (Eq, Bits, Num, Integral, Enum, Real, Ord)
 
 instance Storable Store16LE where
     sizeOf w = sizeOf $ un @Word16 w
@@ -95,7 +97,8 @@ instance Storable Store16LE where
     poke = \ptr w -> poke (castPtr ptr) $ un @Word16 w
 #endif
 
-newtype Store32LE = Store32LE Word32 deriving (Eq, Bits, Num)
+newtype Store32LE = Store32LE Word32
+    deriving (Eq, Bits, Num, Integral, Enum, Real, Ord)
 
 instance Storable Store32LE where
     sizeOf w = sizeOf $ un @Word32 w
@@ -109,7 +112,8 @@ instance Storable Store32LE where
 #endif
 
 
-newtype Store64LE = Store64LE Word64 deriving (Eq, Bits, Num)
+newtype Store64LE = Store64LE Word64
+    deriving (Eq, Bits, Num, Integral, Enum, Real, Ord)
 
 instance Storable Store64LE where
     sizeOf w = sizeOf $ un @Word64 w
@@ -122,7 +126,8 @@ instance Storable Store64LE where
     poke = \ptr w -> poke (castPtr ptr) $ un @Word64 w
 #endif
 
-newtype Store16BE = Store16BE Word16 deriving (Eq, Bits, Num)
+newtype Store16BE = Store16BE Word16
+    deriving (Eq, Bits, Num, Integral, Enum, Real, Ord)
 
 instance Storable Store16BE where
     sizeOf w = sizeOf $ un @Word16 w
@@ -135,7 +140,8 @@ instance Storable Store16BE where
     poke = \ptr w -> poke (castPtr ptr) $ un @Word16 w
 #endif
 
-newtype Store32BE = Store32BE Word32 deriving (Eq, Bits, Num)
+newtype Store32BE = Store32BE Word32
+    deriving (Eq, Bits, Num, Integral, Enum, Real, Ord)
 
 instance Storable Store32BE where
     sizeOf w = sizeOf $ un @Word32 w
@@ -149,7 +155,8 @@ instance Storable Store32BE where
 #endif
 
 
-newtype Store64BE = Store64BE Word64 deriving (Eq, Bits, Num)
+newtype Store64BE = Store64BE Word64
+    deriving (Eq, Bits, Num, Integral, Enum, Real, Ord)
 
 instance Storable Store64BE where
     sizeOf w = sizeOf $ un @Word64 w

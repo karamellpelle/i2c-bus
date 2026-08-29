@@ -122,31 +122,50 @@ register tywrap name addr = do
           instanceD (cxt []) (appT (conT ''Register) (conT ty)) [dAddress, dName, dItem, dRead, dWrite]
     
 
+-- | declare a register of Chip from a numerice type. 
+registerN :: Name -> String -> RegisterAddress -> Q [Dec]
+registerN tywrap name addr = do
+    let ty = mkName name
+    dNewtype <- decNewtype ty tywrap [''Storable, ''Eq, ''Num]
+    dInstanceRegister <- decInstanceRegister ty addr
+    pure [dNewtype, dInstanceRegister]
+    
+    where
+      decInstanceRegister :: Name -> RegisterAddress -> Q Dec
+      decInstanceRegister ty addr = do
+          let dAddress = funD 'registerAddress $ one $ clause [] (normalB $ litE $ integerL $ fromRegisterAddress addr) []
+              dName = funD 'registerName $ one $ clause [] (normalB $ litE $ stringL $ nameBase ty ) []
+              dItem = tySynInstD $ tySynEqn Nothing (appT (conT ''RegisterItem) (conT ty)) (conT tywrap)
+              dRead = decFunctionAssign 'regread 'regread'
+              dWrite = decFunctionAssign 'regwrite 'regwrite'
+          instanceD (cxt []) (appT (conT ''Register) (conT ty)) [dAddress, dName, dItem, dRead, dWrite]
+    
+
 -- | declare a register of Chip that contains Word8 data
 register8 :: String -> RegisterAddress -> Word8 -> Q [Dec]
 register8 name addr def = do
     let name' = mkName name
-    dReg <- register ''Store8 name addr
+    dReg <- registerN ''Store8 name addr
     dInstanceDefault <- decInstanceDefault name' def
-    dInstanceShow <- decInstanceShow name' 'showHex8
+    dInstanceShow <- decInstanceShow name' 'showBin8
     pure $ dReg <> [dInstanceDefault, dInstanceShow]
 
 -- | declare a register of Chip that contains Word16 data as Little Endian
 register16LE :: String -> RegisterAddress -> Word16 -> Q [Dec]
 register16LE name addr def = do
     let name' = mkName name
-    dReg <- register ''Store16LE name addr
+    dReg <- registerN ''Store16LE name addr
     dInstanceDefault <- decInstanceDefault name' def
-    dInstanceShow <- decInstanceShow name' 'showHex16
+    dInstanceShow <- decInstanceShow name' 'showBin16
     pure $ dReg <> [dInstanceDefault, dInstanceShow]
 
 -- | declare a register of Chip that contains Word16 data as Big Endian
 register16BE :: String -> RegisterAddress -> Word16 -> Q [Dec]
 register16BE name addr def = do
     let name' = mkName name
-    dReg <- register ''Store16BE name addr
+    dReg <- registerN ''Store16BE name addr
     dInstanceDefault <- decInstanceDefault name' def
-    dInstanceShow <- decInstanceShow name' 'showHex16
+    dInstanceShow <- decInstanceShow name' 'showBin16
     pure $ dReg <> [dInstanceDefault, dInstanceShow]
 
 
@@ -189,15 +208,26 @@ field ty name bitstr = case bitstrToField bitstr of
         pure $ dGet <> dSet <> dBit
     where
 
+        --getTEST_F :: Integral n => MY_REG16 -> n ; getTEST_F = \w -> fromIntegral $ unsafeShiftR (un @Store16LE w) 13 .&. 1
+
         decGet tywrap ty tycon (size, ix, len) = do
             let funname = mkFunctionName $ "get" <> name  
                 maskE = LitE $ IntegerL $ mkMaskN len 
-            w0 <- newName "w0" 
-            w1 <- newName "w1"
-            pure  [ SigD funname (ForallT [] [AppT (ConT ''Integral) (VarT w1)] (AppT (AppT ArrowT (ConT ty)) (VarT w1)))
-                  , ValD (VarP funname) (NormalB (LamE [ConP tycon [] [VarP w0]] 
-                         (InfixE (Just (VarE 'fromIntegral)) (VarE '($)) (Just (InfixE (Just (AppE (AppE (VarE 'unsafeShiftR) (VarE w0)) (LitE (IntegerL $ fromIntegral ix)))) (VarE '(.&.)) (Just maskE)))))) []
+            n <- newName "n" 
+            w <- newName "w" 
+            --w1 <- newName "w1"
+            --pure  [ SigD funname (ForallT [] [AppT (ConT ''Integral) (VarT w1)] (AppT (AppT ArrowT (ConT ty)) (VarT w1)))
+            --      , ValD (VarP funname) (NormalB (LamE [ConP tycon [] [VarP w0]] 
+            --             (InfixE (Just (VarE 'fromIntegral)) (VarE '($)) (Just (InfixE (Just (AppE (AppE (VarE 'unsafeShiftR) (VarE w0)) (LitE (IntegerL $ fromIntegral ix)))) (VarE '(.&.)) (Just maskE)))))) []
+            --      ]
+
+            pure  [ SigD funname (ForallT [] [AppT (ConT ''Integral) (VarT n)] (AppT (AppT ArrowT (ConT ty)) (VarT n)))
+                  , ValD (VarP funname) (NormalB (LamE [VarP w] (InfixE (Just (VarE 'fromIntegral)) (VarE '($)) (Just (InfixE (Just (AppE (AppE (VarE 'unsafeShiftR) 
+                  (AppE (AppTypeE (VarE 'un) (ConT tywrap)) (VarE w))) (LitE (IntegerL $ fromIntegral ix)))) (VarE '(.&.)) (Just maskE)))))) []
                   ]
+
+                  --[ SigD getTEST_F_2 (ForallT [] [AppT (ConT GHC.Internal.Real.Integral) (VarT n_1)] (AppT (AppT ArrowT (ConT GHCI.MY_REG16)) (VarT n_1)))
+                  --, ValD (VarP getTEST_F_2) (NormalB (LamE [VarP w_3] (InfixE (Just (VarE GHC.Internal.Real.fromIntegral)) (VarE GHC.Internal.Base.$) (Just (InfixE (Just (AppE (AppE (VarE GHC.Internal.Bits.unsafeShiftR) (AppE (AppTypeE (VarE Relude.Extra.Newtype.un) (ConT I2C.Types.Store16LE)) (VarE w_3))) (LitE (IntegerL 13)))) (VarE GHC.Internal.Bits..&.) (Just (LitE (IntegerL 1)))))))) []]
 
         decSet tywrap ty tycon (size, ix, len) = do
             let funname = mkFunctionName $ "set" <> name  
