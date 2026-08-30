@@ -1,7 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE DerivingVia #-}
---{-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -ddump-splices #-}
 {-# OPTIONS_GHC -Wno-type-defaults #-}
 {-# OPTIONS_GHC -Wno-missing-export-lists #-}
@@ -39,35 +38,22 @@ import Language.Haskell.TH.Lib
 -- if you get link errors, run `stack test` which will build the FFI parts,
 -- and those symbols will then be available in GHCi
 
-print16 :: Coercible Word16 a => a -> IO ()
-print16 a = putTextLn $ toText @String $ printf "%016b" $ un @Word16 a
-
-print8 :: Coercible Word8 a => a -> IO ()
-print8 a = putTextLn $ toText @String $ printf "%08b" $ un @Word8 a
-
-print8' :: Integral a => a -> IO ()
-print8' a = print8 (fromIntegral a :: Word8)
-
-print16' :: Integral a => a -> IO ()
-print16' a = print16 (fromIntegral a :: Word16)
-
-
 --------------------------------------------------------------------------------
 -- test data
 
-$(register8 "MY_REG8" 0x22 0x83)
-$(register16LE "MY_REG16" 0x44 0x1122)
+$(register8 "MY8" 0x22 0x83)
+$(register16LE "MY16" 0x44 0x1122)
 
-$(field ''MY_REG16 "FIELD_A"  "00000000000****0")
-$(field ''MY_REG16 "BIT_B"    "00*0000000000000")
-$(field ''MY_REG8  "FIELD_C"  "0000***0")
-$(field ''MY_REG8  "BIT_D"    "00*00000")
+$(field ''MY16 "A_FIELD"  "00000000000****0")
+$(field ''MY16 "A_BIT"    "00*0000000000000")
+$(field ''MY8  "B_FIELD"  "0000***0")
+$(field ''MY8  "B_BIT"    "00*00000")
 
-a :: MY_REG16
-a = MY_REG16 0b0000111100011000
+a :: MY8
+a = MY8 0b00000110
 
-b :: MY_REG8
-b = MY_REG8 0b00000110
+b :: MY16
+b = MY16 0b0000111100011000
 
 
 --------------------------------------------------------------------------------
@@ -163,10 +149,25 @@ testDummy = do
     pPrint $ "Default REG_WORD16: " <> show (def :: REG_WORD16)
 -}
 
+
 ------------------------------------------------------------------------------
--- TH helpers
+-- misc helpers
+--
 printQ :: Show a => Q a -> IO ()
 printQ ma = do
     a <- runQ ma
     pPrint a
+
+print8 :: Integral a => a -> IO ()
+print8 a = print8' (fromIntegral a :: Word8)
+
+print16 :: Integral a => a -> IO ()
+print16 a = print16' (fromIntegral a :: Word16)
+
+
+print16' :: Coercible Word16 a => a -> IO ()
+print16' a = putTextLn $ toText @String $ printf "%016b" $ un @Word16 a
+
+print8' :: Coercible Word8 a => a -> IO ()
+print8' a = putTextLn $ toText @String $ printf "%08b" $ un @Word8 a
 

@@ -240,15 +240,26 @@ field :: Name -> String -> String -> Q [Dec]
 field ty name bitstr = case bitstrToField bitstr of
     Left err              -> fail err
     Right sil@(size, ix, len) -> do
-        --info <- reify ty
-        --runIO $ print info
+        info <- reify ty
+        runIO $ print info
   
         TyConI (NewtypeD _ _ty _ _ (NormalC tycon [(_, ConT tywrap)]) _)  <- reify ty
+        TyConI (NewtypeD _ _ty _ _ (NormalC tycon [(_, ConT tywrap')]) _)  <- reify tywrap
+
+        info <- reify tywrap
+        runIO $ print info
+        
+        assertCorrectSize size tywrap'
         dGet <- decGet tywrap ty tycon sil
         dSet <- decSet tywrap ty tycon sil
         dBit <- if len == 1 then decBit tywrap ty sil else mempty
         pure $ dGet <> dSet <> dBit
     where
+        assertCorrectSize size ty | ty == ''Word8   = when (size /= 8)  $ fail $ "Bitstring " <> bitstr <> " doesn't match expected size 8 (got "  <> show size <> ")"
+                                  | ty == ''Word16  = when (size /= 16) $ fail $ "Bitstring " <> bitstr <> " doesn't match expected size 16 (got " <> show size <> ")"
+                                  | ty == ''Word32  = when (size /= 32) $ fail $ "Bitstring " <> bitstr <> " doesn't match expected size 32 (got " <> show size <> ")"
+                                  | ty == ''Word64  = when (size /= 64) $ fail $ "Bitstring " <> bitstr <> " doesn't match expected size 64 (got " <> show size <> ")"
+                                  | otherwise       = fail $ "Didn't expect type " <> show ty
 
         decGet tywrap ty tycon (size, ix, len) = do
             let funname = mkFunctionName $ "get" <> name  
@@ -291,8 +302,7 @@ mkMaskIxLen ix len =
     shiftL (shiftL 0b1 (fromIntegral len) - 1) (fromIntegral ix)
 
 mkFunctionName :: String -> Name
-mkFunctionName str = 
-    Name (OccName str) NameS
+mkFunctionName = mkName 
 
 --------------------------------------------------------------------------------
 --  helpers
