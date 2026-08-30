@@ -61,13 +61,12 @@ import Language.Haskell.TH.Lib
 
 -- | declare a Chip with name 'name' at _7_ bit bus address 'addr'
 --
--- > $(chip "Chip123" 0x22)  =>
--- >   
--- > data Chip123
--- >
--- > instance Chip Chip123 where
--- >     chipAddress = 0x22
--- >     chipName = "Chip123"
+--  $(chip "Chip123" 0x22)
+--  ======>
+--    data Chip123 deriving Show
+--    instance Chip Chip123 where
+--      chipAddress = 34
+--      chipName = "Chip123"
 --
 chip :: String -> ChipAddress -> Q [Dec]
 chip name addr = do
@@ -102,8 +101,8 @@ regwrite' busdev = \r ->
     liftIO $ write busdev $ StorableAB (registerAddress @reg) r
 
 
--- | declare a register of Chip from Storable type. Storable is 
---   relative to I2C chip
+-- | declare a register of Chip from Storable type. 
+--   Storable is relative to I2C chip data
 register :: Name -> String -> RegisterAddress -> Q [Dec]
 register tywrap name addr = do
     let ty = mkName name
@@ -142,6 +141,25 @@ registerN tywrap name addr = do
     
 
 -- | declare a register of Chip that contains Word8 data
+--
+--   $(register8 "MYREG8" 0x24 0x11)
+--   ======>
+--     newtype MYREG8
+--       = MYREG8 Store8
+--       deriving Storable
+--       deriving Eq
+--       deriving Num
+--     instance Register MYREG8 where
+--       type RegisterItem MYREG8 = Store8
+--       registerAddress = 36
+--       registerName = "MYREG8"
+--       regread = I2C.TH.regread'
+--       regwrite = I2C.TH.regwrite'
+--     instance Default MYREG8 where
+--       def = MYREG8 17
+--     instance Show MYREG8 where
+--       Text.Show.show = I2C.TH.showBin8
+--
 register8 :: String -> RegisterAddress -> Word8 -> Q [Dec]
 register8 name addr def = do
     let name' = mkName name
@@ -151,6 +169,25 @@ register8 name addr def = do
     pure $ dReg <> [dInstanceDefault, dInstanceShow]
 
 -- | declare a register of Chip that contains Word16 data as Little Endian
+--
+--   $(register16LE "MYREG16" 0x26 0x3322)
+--   ======>
+--     newtype MYREG16
+--       = MYREG16 Store16LE
+--       deriving Storable
+--       deriving Eq
+--       deriving Num
+--     instance Register MYREG16 where
+--       type RegisterItem MYREG16 = Store16LE
+--       registerAddress = 38
+--       registerName = "MYREG16"
+--       regread = I2C.TH.regread'
+--       regwrite = I2C.TH.regwrite'
+--     instance Default MYREG16 where
+--       def = MYREG16 13090
+--     instance Show MYREG16 where
+--       Text.Show.show = I2C.TH.showBin16
+--
 register16LE :: String -> RegisterAddress -> Word16 -> Q [Dec]
 register16LE name addr def = do
     let name' = mkName name
@@ -175,25 +212,30 @@ register16BE name addr def = do
 
 -- | declare a (sub)field of a register 
 --
---   field ''REG16 "MY_FIELD" "00000000000****0"
--- ======>
---   getMY_FIELD :: (Integral w1) => MY_REG -> w1
---   getMY_FIELD = \(REG16 w0) -> fromIntegral $ (unsafeShiftR w0 1 .&. 0b0000000000001111)
---   setMY_FIELD :: (Integral w) => w -> REG16 -> REG16
---   setMY_FIELD = \w1 (REG16 w0) -> REG16 $ ((w0 .&. complement 0b0000000000011110) .|. unsafeShiftL (0b0000000000001111 .&. fromIntegral w1) 1)
+--   $(field ''MYREG8 "VALUES" "00***000")
+--   ======>
+--     getVALUES :: Integral n => MYREG8 -> n
+--     getVALUES
+--       = \w -> (fromIntegral $ (unsafeShiftR (un @Store8 w) 3 .&. 7))
+--     setVALUES :: Integral n => n -> MYREG8 -> MYREG8
+--     setVALUES
+--       = \ n -> (under @Store8 $ (\ w -> ((w .&. complement 56) .|. unsafeShiftL (7 .&. fromIntegral n) 3)))
 --
---   field ''REG8 "MY_BIT" "00*00000"
--- ======>
---   getMY_BIT :: Integral w1 => REG8 -> w1
---   getMY_BIT = \(REG8 w0) -> (fromIntegral $ (unsafeShiftR w0 5 .&. 1))
---   setMY_BIT :: Integral w => w -> REG8 -> REG8
---   setMY_BIT = \w1 (REG8 w0) -> (REG8 $ ((w0 .&. complement 0b00100000) .|. unsafeShiftL (0b00000001 .&. fromIntegral w1) 5))
---   bitsetMY_BIT :: REG8 -> REG8
---   bitsetMY_BIT = under @Word8 (flip setBit 5)
---   bitclearMY_BIT :: REG8 -> REG8
---   bitclearMY_BIT = under @Word8 (flip clearBit 5)
---   bittoggleMY_BIT :: REG8 -> REG8
---   bittoggleMY_BIT = under @Word8 (flip complementBit 5)
+--   $(field ''MYREG16 "ENABLE" "000*000000000000")
+--   ======>
+--     getENABLE :: Integral n => MYREG16 -> n
+--     getENABLE
+--       = \w -> (fromIntegral $ (unsafeShiftR (un @Store16LE w) 12 .&. 1))
+--     setENABLE :: Integral n => n -> MYREG16 -> MYREG16
+--     setENABLE
+--       = \ n -> (under @Store16LE $ (\ w -> ((w .&. complement 4096) .|. unsafeShiftL (1 .&. fromIntegral n) 12)))
+--     bitsetENABLE :: MYREG16 -> MYREG16
+--     bitsetENABLE = under @Store16LE (flip setBit 12)
+--     bitclearENABLE :: MYREG16 -> MYREG16
+--     bitclearENABLE = under @Store16LE (flip clearBit 12)
+--     bittoggleENABLE :: MYREG16 -> MYREG16
+--     bittoggleENABLE = under @Store16LE (flip complementBit 12)
+--
 field :: Name -> String -> String -> Q [Dec]
 field ty name bitstr = case bitstrToField bitstr of
     Left err              -> fail err
@@ -208,38 +250,29 @@ field ty name bitstr = case bitstrToField bitstr of
         pure $ dGet <> dSet <> dBit
     where
 
-        --getTEST_F :: Integral n => MY_REG16 -> n ; getTEST_F = \w -> fromIntegral $ unsafeShiftR (un @Store16LE w) 13 .&. 1
-
         decGet tywrap ty tycon (size, ix, len) = do
             let funname = mkFunctionName $ "get" <> name  
                 maskE = LitE $ IntegerL $ mkMaskN len 
             n <- newName "n" 
             w <- newName "w" 
-            --w1 <- newName "w1"
-            --pure  [ SigD funname (ForallT [] [AppT (ConT ''Integral) (VarT w1)] (AppT (AppT ArrowT (ConT ty)) (VarT w1)))
-            --      , ValD (VarP funname) (NormalB (LamE [ConP tycon [] [VarP w0]] 
-            --             (InfixE (Just (VarE 'fromIntegral)) (VarE '($)) (Just (InfixE (Just (AppE (AppE (VarE 'unsafeShiftR) (VarE w0)) (LitE (IntegerL $ fromIntegral ix)))) (VarE '(.&.)) (Just maskE)))))) []
-            --      ]
 
             pure  [ SigD funname (ForallT [] [AppT (ConT ''Integral) (VarT n)] (AppT (AppT ArrowT (ConT ty)) (VarT n)))
                   , ValD (VarP funname) (NormalB (LamE [VarP w] (InfixE (Just (VarE 'fromIntegral)) (VarE '($)) (Just (InfixE (Just (AppE (AppE (VarE 'unsafeShiftR) 
                   (AppE (AppTypeE (VarE 'un) (ConT tywrap)) (VarE w))) (LitE (IntegerL $ fromIntegral ix)))) (VarE '(.&.)) (Just maskE)))))) []
                   ]
 
-                  --[ SigD getTEST_F_2 (ForallT [] [AppT (ConT GHC.Internal.Real.Integral) (VarT n_1)] (AppT (AppT ArrowT (ConT GHCI.MY_REG16)) (VarT n_1)))
-                  --, ValD (VarP getTEST_F_2) (NormalB (LamE [VarP w_3] (InfixE (Just (VarE GHC.Internal.Real.fromIntegral)) (VarE GHC.Internal.Base.$) (Just (InfixE (Just (AppE (AppE (VarE GHC.Internal.Bits.unsafeShiftR) (AppE (AppTypeE (VarE Relude.Extra.Newtype.un) (ConT I2C.Types.Store16LE)) (VarE w_3))) (LitE (IntegerL 13)))) (VarE GHC.Internal.Bits..&.) (Just (LitE (IntegerL 1)))))))) []]
-
         decSet tywrap ty tycon (size, ix, len) = do
             let funname = mkFunctionName $ "set" <> name  
                 maskE0 = LitE $ IntegerL $ mkMaskIxLen ix len 
                 maskE1 = LitE $ IntegerL $ mkMaskN len 
                 ixE    = LitE $ IntegerL $ fromIntegral ix
+            n <- newName "n" 
             w <- newName "w" 
-            w0 <- newName "w0" 
-            w1 <- newName "w1"
-            pure  [ SigD funname (ForallT [] [AppT (ConT ''Integral) (VarT w)] (AppT (AppT ArrowT (VarT w)) (AppT ( AppT ArrowT (ConT ty)) (ConT ty))))
-                  , ValD (VarP funname) (NormalB (LamE [VarP w1,ConP tycon [] [VarP w0]] (InfixE (Just (ConE tycon)) (VarE '($)) (Just (InfixE (Just (InfixE (Just (VarE w0)) (VarE '(.&.)) (Just (AppE (VarE 'complement) (maskE0))))) (VarE '(.|.)) (Just (AppE (AppE (VarE 'unsafeShiftL) (InfixE (Just maskE1) (VarE '(.&.)) (Just (AppE (VarE 'fromIntegral) (VarE w1))))) ixE))))))) []]
             
+            pure  [ SigD funname (ForallT [] [AppT (ConT ''Integral) (VarT n)] (AppT (AppT ArrowT (VarT n)) (AppT (AppT ArrowT (ConT ty)) (ConT ty))))
+                  , ValD (VarP funname) (NormalB (LamE [VarP n] (InfixE (Just (AppTypeE (VarE 'under) (ConT tywrap))) (VarE '($)) (Just (LamE [VarP w] (InfixE (Just (InfixE (Just (VarE w)) (VarE '(.&.)) (Just (AppE (VarE 'complement) (maskE0))))) (VarE '(.|.)) (Just (AppE (AppE (VarE 'unsafeShiftL) (InfixE (Just maskE1) (VarE '(.&.)) (Just (AppE (VarE 'fromIntegral) (VarE n))))) ixE)))))))) []
+                  ]
+
         decBit tywrap ty (size, ix, len) = do
             fmap concat $ forM [("bitset", 'setBit), ("bitclear", 'clearBit), ("bittoggle", 'complementBit)] $ \(prefix, underF) -> do
                 let funname = mkFunctionName $ prefix <> name  
@@ -260,17 +293,6 @@ mkMaskIxLen ix len =
 mkFunctionName :: String -> Name
 mkFunctionName str = 
     Name (OccName str) NameS
-
---fieldGet :: (Integral w1, Bits w1) => Word -> w0 -> (w0 -> w1)
---fieldGet ix mask = \w0 -> fromIntegral $ (unsafeShiftR w0 (fromIntegral ix) .&. mask)
---
---    getMY_FIELD :: (Integral w1, Bits w1) => MY_REG -> w1
---    getMY_FIELD = \(MY_REG w0) -> fromIntegral $ (unsafeShiftR w0 1 .&. 0b0000000000001111)
---    setMY_FIELD :: (Integral w, Bits w) => w -> MY_REG -> MY_REG
---    setMY_FIELD = \w1 (MY_REG w0) -> MY_REG $ ((w0 .&. complement 0b0000000000011110) .|. unsafeShiftL (0b0000000000001111 .&. fromIntegral w1) 1)
---
-
-
 
 --------------------------------------------------------------------------------
 --  helpers

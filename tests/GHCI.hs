@@ -51,6 +51,10 @@ print8' a = print8 (fromIntegral a :: Word8)
 print16' :: Integral a => a -> IO ()
 print16' a = print16 (fromIntegral a :: Word16)
 
+
+--------------------------------------------------------------------------------
+-- test data
+
 $(register8 "MY_REG8" 0x22 0x83)
 $(register16LE "MY_REG16" 0x44 0x1122)
 
@@ -65,23 +69,6 @@ a = MY_REG16 0b0000111100011000
 b :: MY_REG8
 b = MY_REG8 0b00000110
 
-getTEST_F :: Integral n => MY_REG16 -> n ; getTEST_F = \w -> fromIntegral $ unsafeShiftR (un @Store16LE w) 13 .&. 1
-
---getTEST_F :: Integral n => MY_REG16 -> n
---getTEST_F = 
---    -- \(MY_REG16 w) -> (fromIntegral $ (unsafeShiftR w 13 .&. 1))
---    \w -> fromIntegral $ unsafeShiftR (un @Store16LE w) 13 .&. 1
-
-setTEST_F :: Integral n => n -> MY_REG16 -> MY_REG16
-setTEST_F = -- \n (MY_REG16 w) -> (MY_REG16 $ ((w .&. complement 8192) .|. unsafeShiftL (1 .&. fromIntegral n) 13))
-    \n -> under @Store16LE $ \w -> (w .&. complement 8192) .|. unsafeShiftL (1 .&. fromIntegral n) 13
-
-------------------------------------------------------------------------------
--- TH helpers
-printQ :: Show a => Q a -> IO ()
-printQ ma = do
-    a <- runQ ma
-    pPrint a
 
 --------------------------------------------------------------------------------
 --  PCF8575
@@ -175,4 +162,11 @@ testDummy = do
     pPrint $ "Default REG_WORD8:  " <> show (def :: REG_WORD8)
     pPrint $ "Default REG_WORD16: " <> show (def :: REG_WORD16)
 -}
+
+------------------------------------------------------------------------------
+-- TH helpers
+printQ :: Show a => Q a -> IO ()
+printQ ma = do
+    a <- runQ ma
+    pPrint a
 

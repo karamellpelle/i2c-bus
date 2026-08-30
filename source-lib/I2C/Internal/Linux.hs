@@ -176,7 +176,7 @@ write busdev@(BusDevice _id ptr) = \w -> do
 --      * call shall fail if 'w' can't be written fully.
 --      * call can fail if the slave does not NACK after reading a larger number 
 --        of bytes determined by the backend (typically by filling up a buffer).
-writeSome :: forall chip w r . (Chip chip) => BusDevice chip -> ByteString -> IO Word
+writeSome :: forall chip w . (Chip chip) => BusDevice chip -> ByteString -> IO Word
 writeSome busdev = \bs ->
     throwIO $ errI2C eNOSYS "writeSome not implemented on Linux"
 
