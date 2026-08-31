@@ -125,7 +125,7 @@ register tywrap name addr = do
 registerN :: Name -> String -> RegisterAddress -> Q [Dec]
 registerN tywrap name addr = do
     let ty = mkName name
-    dNewtype <- decNewtype ty tywrap [''Storable, ''Eq, ''Num]
+    dNewtype <- decNewtype ty tywrap [''Storable, ''Eq]
     dInstanceRegister <- decInstanceRegister ty addr
     pure [dNewtype, dInstanceRegister]
     
@@ -148,7 +148,6 @@ registerN tywrap name addr = do
 --       = MYREG8 Store8
 --       deriving Storable
 --       deriving Eq
---       deriving Num
 --     instance Register MYREG8 where
 --       type RegisterItem MYREG8 = Store8
 --       registerAddress = 36
@@ -176,7 +175,6 @@ register8 name addr def = do
 --       = MYREG16 Store16LE
 --       deriving Storable
 --       deriving Eq
---       deriving Num
 --     instance Register MYREG16 where
 --       type RegisterItem MYREG16 = Store16LE
 --       registerAddress = 38
@@ -240,20 +238,20 @@ field :: Name -> String -> String -> Q [Dec]
 field ty name bitstr = case bitstrToField bitstr of
     Left err              -> fail err
     Right sil@(size, ix, len) -> do
-        info <- reify ty
-        runIO $ print info
+        --info <- reify ty
+        --runIO $ print info
   
         TyConI (NewtypeD _ _ty _ _ (NormalC tycon [(_, ConT tywrap)]) _)  <- reify ty
         TyConI (NewtypeD _ _ty _ _ (NormalC tycon [(_, ConT tywrap')]) _)  <- reify tywrap
 
-        info <- reify tywrap
-        runIO $ print info
-        
         assertCorrectSize size tywrap'
+
         dGet <- decGet tywrap ty tycon sil
         dSet <- decSet tywrap ty tycon sil
         dBit <- if len == 1 then decBit tywrap ty sil else mempty
+
         pure $ dGet <> dSet <> dBit
+
     where
         assertCorrectSize size ty | ty == ''Word8   = when (size /= 8)  $ fail $ "Bitstring " <> bitstr <> " doesn't match expected size 8 (got "  <> show size <> ")"
                                   | ty == ''Word16  = when (size /= 16) $ fail $ "Bitstring " <> bitstr <> " doesn't match expected size 16 (got " <> show size <> ")"
