@@ -1,6 +1,4 @@
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE DerivingVia #-}
 {-# OPTIONS_GHC -ddump-splices #-}
 {-# OPTIONS_GHC -Wno-type-defaults #-}
 {-# OPTIONS_GHC -Wno-missing-export-lists #-}
@@ -25,29 +23,33 @@ import Foreign
 import Language.Haskell.TH
 import Language.Haskell.TH.Syntax
 import Language.Haskell.TH.Lib
+import Data.Storable.Endian
 
+--------------------------------------------------------------------------------
 --
--- * load ghci with linux build:
---    $ stack ghci --package=pretty-simple  --flag=i2c:-build-empty --flag=i2c:build-linux
--- * load ghci with dummy build:
---    $ stack ghci --package=pretty-simple  --flag=i2c:build-empty --flag=i2c:-build-linux
+-- * load ghci (with extra package pretty-simple that provides handy `pPrint` function):
+--    $ stack ghci --package=pretty-simple --package=storable-endian
 --
 -- then load this file:
 --    ghci> :l tests/GHCI.hs
 --  
 -- if you get link errors, run `stack test` which will build the FFI parts,
 -- and those symbols will then be available in GHCi
+--  
+--------------------------------------------------------------------------------
+
 
 --------------------------------------------------------------------------------
 -- test data
 
 $(register8 "MY8" 0x22 0x83)
-$(register16LE "MY16" 0x44 0x1122)
+$(field    ''MY8   "A_FIELD"  "0000***0")
+$(field    ''MY8   "A_BIT"    "00*00000")
 
-$(field ''MY16 "A_FIELD"  "00000000000****0")
-$(field ''MY16 "A_BIT"    "00*0000000000000")
-$(field ''MY8  "B_FIELD"  "0000***0")
-$(field ''MY8  "B_BIT"    "00*00000")
+$(register16LE "MY16" 0x44 0x1122)
+$(field       ''MY16  "B_FIELD"  "00000000000****0")
+$(field       ''MY16  "B_BIT"    "00*0000000000000")
+
 
 a :: MY8
 a = MY8 0b00000110
@@ -72,7 +74,6 @@ testPCF8575 = do
         rawwrite @PCF8575 @Word16 busdev ix
         threadDelay 400000
 
-{-
 --------------------------------------------------------------------------------
 --  MPU6050
 
@@ -81,73 +82,50 @@ testPCF8575 = do
 --  * https://github.com/adafruit/Adafruit_MPU6050/blob/master/Adafruit_MPU6050.cpp
 --  * https://www.invensense.tdk.com/en-us/download-resource/ps-mpu-6000a-00-mpu-6000-and-mpu-6050-datasheet
 --  * https://www.invensense.tdk.com/download-resource/rm-mpu-6000a-00-mpu-6000-and-mpu-6050-register-map-and-descriptions
+
+data TemperatureC = TemperatureC Double
+
+instance Show TemperatureC where
+    show (TemperatureC n) = printf "%+ 3.1f °C" n
+
+-- Temperature in degrees C = (TEMP_OUT Register Value as a signed quantity)/340 + 36.53
+instance Storable TemperatureC where
+    sizeOf a = 2
+    alignment a = 1
+    peek ptr = do
+        n <- peekBE @Int16 $ castPtr ptr
+        pure $ TemperatureC $ (fromIntegral n) / 340.0 + 36.53
+    poke ptr (TemperatureC a) = do
+        pokeBE @Int16 (castPtr ptr) $ truncate $ (a - 36.53) * 340.0
+
+
 $(chip "MPU6050" 0x68)
 
-$(register8 "USER_CTRL" 106 0x00)
-$(register8 "INT_PIN_CFG" 55 0x00)
-$(register8 "PWR_MGMT_1" 107 0x40)
+$(register8 "USER_CTRL" 0x6A 0x00)
+$(field    ''USER_CTRL "FIFO_RESET"      "00000*00")
+$(field    ''USER_CTRL "I2C_MST_RESET"   "000000*0")
+$(field    ''USER_CTRL "SIG_COND_RESET"  "0000000*")
 
--- $(register ''Temperature "TEMP" 0x41 0x0000)
--- $(register ''Gyro "GYRO" 0x43 0x0000)
+$(register8 "PWR_MGMT_1" 0x6B 0x40)
+$(field    ''PWR_MGMT_1 "CLKSEL"         "00000***")
+$(field    ''PWR_MGMT_1 "SLEEP"          "0*000000")
+
+$(register ''TemperatureC "TEMP_OUT" 0x41)
+
 
 testMPU6050 :: IO ()
 testMPU6050 = do
     busdev <- openChip @MPU6050 "/dev/i2c-1"
 
-    regwrite busdev 0x6A $ 0b00000111
-    regwrite busdev 0x6B $ 0b00000010 -- disable sleep and set PLL from Y axis gyroscope reference
--}
-{-
+    regwrite busdev $ def & bitsetFIFO_RESET & bitsetI2C_MST_RESET & bitsetSIG_COND_RESET
+    regwrite busdev $ def & setCLKSEL 2 & bitclearSLEEP
+
     forever $ do
-        -- acceleration:
-        x <- regread2 busdev 0x3B
-        y <- regread2 busdev 0x3D
-        z <- regread2 busdev 0x3F
-        -- gyroscope
-        --x <- regread2 busdev 0x43
-        --y <- regread2 busdev 0x45
-        --z <- regread2 busdev 0x47
-        -- temperature
-        t <- regread busdev 0x41
-        print @Temperature t
 
-        let x' = (fromIntegral x :: Int16)
-        let y' = (fromIntegral y :: Int16)
-        let z' = (fromIntegral z :: Int16)
-        putTextLn $ toText @String $ printf "X: %+ 6d Y: %+ 6d Z: %+ 6d" x' y' z'
-        --putTextLn $ toText @String $ printf "X: %04X Y: %04X Z: %04X, temp: %04X" x y z t
+        r :: TEMP_OUT <- regread busdev 
+        putTextLn $ show $ un @TemperatureC r
 
-        let t' = (fromIntegral @Int16 @Double (fromIntegral @Word16 @Int16 t) / 340.0 + 36.53) 
-        putTextLn $ toText @String $ printf "T: %+ 3.1f " t'
-
-        putTextLn ""
-
-        -- ^ output doesn't look right, maybe the register setups are wrong :)
         threadDelay 400000
--}
-
---------------------------------------------------------------------------------
---  dummy
-
-{-
-$(chip "Chip123" 0xDE)
-
-$(register1 "REG_WORD8"  0x10 0x0A)
-$(register2 "REG_WORD16" 0x20 0x0B0C)
-
-testDummy :: IO ()
-testDummy = do
-    busdev <- openChip @Chip123 "/dev/i2c-1"
-
-    a <- regread busdev
-    b <- regread busdev
-
-    pPrint $ "REG_WORD8:  " <> show (a :: REG_WORD8)
-    pPrint $ "REG_WORD16: " <> show (b :: REG_WORD16)
-
-    pPrint $ "Default REG_WORD8:  " <> show (def :: REG_WORD8)
-    pPrint $ "Default REG_WORD16: " <> show (def :: REG_WORD16)
--}
 
 
 ------------------------------------------------------------------------------

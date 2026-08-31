@@ -350,7 +350,7 @@ bitstrToField bitstr =
           (_:as')   -> rest ix len (ix + len) as
           []        -> rest ix len (ix + len) []
       rest ix len total as = case as of
-          ('*':_)   -> Left $ "field is disconnected: " <> bitstr
+          ('*':_)   -> Left $ "Field is disconnected: " <> bitstr
           (_:as')   -> rest ix len (succ total) as'
           []        -> Right (total, ix, len)
 

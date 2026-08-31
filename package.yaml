@@ -7,7 +7,7 @@ name:
 version:
     0.3
 github:
-    karamellpelle/piradio
+    karamellpelle/i2c-registers
 homepage:
     https://github.com/karamellpelle/i2c-registers
 license:
