@@ -25,6 +25,7 @@ category:
     - chip
     - i2c
     #- eeprom
+    #- raspberrypi
 extra-source-files:
     - README.md
     - CHANGELOG.md
@@ -38,11 +39,11 @@ description: |
 language: GHC2024 
 
 # build flags
-flags:
-  build-empty:
-      description: Use a dummy backend
-      default: false
-      manual: true 
+#flags:
+#  build-empty:
+#      description: Use a dummy backend
+#      default: false
+#      manual: true 
 
 dependencies:
     - base
@@ -89,10 +90,7 @@ library:
     other-extensions:
         - CPP
     when: 
-      - condition: flag(build-empty)
-        exposed-modules:
-          - I2C.Internal.Empty
-      - condition: os(linux) && !flag(build-empty)
+      - condition: os(linux)
         exposed-modules:
           - I2C.Internal.Linux
         dependencies: 
@@ -109,8 +107,6 @@ library:
 when:
   - condition: os( linux )
     cpp-options: -UINTERNAL_USE_EMPTY -DINTERNAL_USE_LINUX
-  - condition: flag(build-empty)
-    cpp-options: -UINTERNAL_USE_LINUX -DINTERNAL_USE_EMPTY
     # see values of 'arch' here: https://hackage-content.haskell.org/package/base-4.22.0.0/docs/System-Info.html#v:arch
     # TODO: add architectures to big or little endian
   - condition: arch( aarch64 ) || arch( i386 ) || arch( x86_64 )
@@ -122,7 +118,7 @@ tests:
     empty:
         source-dirs: tests/empty/
         main:        Main.hs
-        cpp-options: -DINTERNAL_USE_EMPTY
+        #cpp-options: -DINTERNAL_USE_EMPTY
         ghc-options:
             - -threaded
             - -rtsopts

@@ -24,9 +24,6 @@ module I2C.Internal
 #ifdef INTERNAL_USE_LINUX
     module I2C.Internal.Linux,
 #endif
-#ifdef INTERNAL_USE_EMPTY
-    module I2C.Internal.Empty,
-#endif
 
 ) where
 
@@ -34,9 +31,6 @@ import Relude
 
 #ifdef INTERNAL_USE_LINUX
 import I2C.Internal.Linux
-#endif
-#ifdef INTERNAL_USE_EMPTY
-import I2C.Internal.Empty
 #endif
 
 --------------------------------------------------------------------------------
