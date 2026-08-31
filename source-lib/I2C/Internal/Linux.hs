@@ -120,16 +120,15 @@ read :: forall chip w r . (Chip chip, Storable w, Storable r)  =>
 read busdev@(BusDevice _id ptr) = \w -> do
     let sizeW = sizeOf w 
         sizeR = sizeOf (undefined :: r)
-    when (maxTransferSize < (fI $ sizeW + sizeR)) $ throwIO $ errI2C eNOMEM $ tagErr busdev
+    when (maxTransferSize < (fI $ max sizeW sizeR)) $ throwIO $ errI2C eNOMEM $ tagErr busdev
 
-    res <- try @IOException $ allocaBytes @Word8 (sizeW + sizeR) $ \mem -> do
-        let ptrW = plusPtr mem 0
-            ptrR = plusPtr mem sizeW
-        -- set write value
-        poke (castPtr ptrW) w
-        _ <- assertOK (tagErr busdev) $ c_i2c_read ptr (fromChipAddress $ chipAddress @chip) ptrW (fI sizeW) ptrR (fI sizeR)
 
-        peek $ castPtr ptrR
+    res <- try @IOException $ allocaBytes @Word8 (max sizeW sizeR) $ \mem -> do
+        -- set write data. this data will be overwritten after reading
+        poke (castPtr mem) w
+        _ <- assertOK (tagErr busdev) $ c_i2c_read ptr (fromChipAddress $ chipAddress @chip) mem (fI sizeW) mem (fI sizeR)
+        peek $ castPtr mem
+
     case res of
         Right a   -> pure a
         Left err  -> throwIO $ fromIOException err
@@ -176,17 +175,17 @@ write busdev@(BusDevice _id ptr) = \w -> do
 --      * call shall fail if 'w' can't be written fully.
 --      * call can fail if the slave does not NACK after reading a larger number 
 --        of bytes determined by the backend (typically by filling up a buffer).
-writeSome :: forall chip w . (Chip chip) => BusDevice chip -> ByteString -> IO Word
+writeSome :: forall chip . (Chip chip) => BusDevice chip -> ByteString -> IO Word
 writeSome busdev = \bs ->
     throwIO $ errI2C eNOSYS "writeSome not implemented on Linux"
 
 
 -- | maximal number of bytes allowed in a transaction. 
---   for 'read' and 'readSome' the size of the write part is included.
+--   note that for 'read' and 'readSome' the size of the write part is included.
 --   FIXME: find a suitable value that does not segfault the stack with
 --   the call to 'allocaBytesAligned'
 maxTransferSize :: Word
-maxTransferSize = 100     -- 100: 4 bytes read + 96 bytes read
+maxTransferSize = 96
 
 
 fI :: (Integral a, Num b) => a -> b
