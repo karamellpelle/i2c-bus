@@ -103,19 +103,17 @@ regwrite' busdev = \r ->
 
 -- | declare a register of Chip from Storable type. 
 --   Storable is relative to I2C chip data
-register :: Name -> String -> RegisterAddress -> Q [Dec]
-register tywrap name addr = do
-    let ty = mkName name
-    dNewtype <- decNewtype ty tywrap [''Storable]
+register :: Name -> RegisterAddress -> Q [Dec]
+register ty addr = do
     dInstanceRegister <- decInstanceRegister ty addr
-    pure [dNewtype, dInstanceRegister]
+    pure [dInstanceRegister]
     
     where
       decInstanceRegister :: Name -> RegisterAddress -> Q Dec
       decInstanceRegister ty addr = do
           let dAddress = funD 'registerAddress $ one $ clause [] (normalB $ litE $ integerL $ fromRegisterAddress addr) []
               dName = funD 'registerName $ one $ clause [] (normalB $ litE $ stringL $ nameBase ty ) []
-              dItem = tySynInstD $ tySynEqn Nothing (appT (conT ''RegisterItem) (conT ty)) (conT tywrap)
+              dItem = tySynInstD $ tySynEqn Nothing (appT (conT ''RegisterItem) (conT ty)) (conT ty)
               dRead = decFunctionAssign 'regread 'regread'
               dWrite = decFunctionAssign 'regwrite 'regwrite'
           instanceD (cxt []) (appT (conT ''Register) (conT ty)) [dAddress, dName, dItem, dRead, dWrite]

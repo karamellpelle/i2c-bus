@@ -83,19 +83,19 @@ testPCF8575 = do
 --  * https://www.invensense.tdk.com/en-us/download-resource/ps-mpu-6000a-00-mpu-6000-and-mpu-6050-datasheet
 --  * https://www.invensense.tdk.com/download-resource/rm-mpu-6000a-00-mpu-6000-and-mpu-6050-register-map-and-descriptions
 
-data TemperatureC = TemperatureC Double
+data TEMP_OUT = TEMP_OUT Double
 
-instance Show TemperatureC where
-    show (TemperatureC n) = printf "%+ 3.1f °C" n
+instance Show TEMP_OUT where
+    show (TEMP_OUT n) = printf "%+ 3.1f °C" n
 
 -- Temperature in degrees C = (TEMP_OUT Register Value as a signed quantity)/340 + 36.53
-instance Storable TemperatureC where
+instance Storable TEMP_OUT where
     sizeOf a = 2
     alignment a = 1
     peek ptr = do
         n <- peekBE @Int16 $ castPtr ptr
-        pure $ TemperatureC $ (fromIntegral n) / 340.0 + 36.53
-    poke ptr (TemperatureC a) = do
+        pure $ TEMP_OUT $ (fromIntegral n) / 340.0 + 36.53
+    poke ptr (TEMP_OUT a) = do
         pokeBE @Int16 (castPtr ptr) $ truncate $ (a - 36.53) * 340.0
 
 
@@ -110,7 +110,7 @@ $(register8 "PWR_MGMT_1" 0x6B 0x40)
 $(field    ''PWR_MGMT_1 "CLKSEL"         "00000***")
 $(field    ''PWR_MGMT_1 "SLEEP"          "0*000000")
 
-$(register ''TemperatureC "TEMP_OUT" 0x41)
+$(register ''TEMP_OUT 0x41)
 
 
 testMPU6050 :: IO ()
@@ -123,7 +123,7 @@ testMPU6050 = do
     forever $ do
 
         r :: TEMP_OUT <- regread busdev 
-        putTextLn $ show $ un @TemperatureC r
+        putTextLn $ show $ un @TEMP_OUT r
 
         threadDelay 400000
 
