@@ -29,6 +29,7 @@ module I2C
     Register (..),
 
     module I2C.TH,
+    module I2C.Types,
 ) where
 
 import I2C.Types
