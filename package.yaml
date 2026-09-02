@@ -3,13 +3,13 @@
 spec-version: 0.36.0
 
 name:
-    i2c-registers
+    i2c-bus
 version:
     0.3
 github:
-    karamellpelle/i2c-registers
+    karamellpelle/i2c-bus
 homepage:
-    https://github.com/karamellpelle/i2c-registers
+    https://github.com/karamellpelle/i2c-bus
 license:
     MIT
 license-file:
@@ -24,8 +24,8 @@ category:
     - hardware
     - chip
     - i2c
+    - raspberrypi
     #- eeprom
-    #- raspberrypi
 extra-source-files:
     - README.md
     - CHANGELOG.md
@@ -125,7 +125,7 @@ tests:
             - -with-rtsopts "-N -T"
             - -Wno-unused-packages
         dependencies:
-            - i2c-registers
+            - i2c-bus
             - pretty-simple
             #- hedgehog
             #- tasty

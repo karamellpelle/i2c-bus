@@ -1,2 +1,2 @@
-# i2c-registers
+# i2c-bus
 
