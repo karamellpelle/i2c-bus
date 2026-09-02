@@ -1,5 +1,2 @@
 # TODO
-* add TH for data types 32 and 64 BE/LE
-* backend as typeclass so library users can define their own backends, for example 
-  from an USB-adapter?
-* fix `HasCallStack` when throwing I2CErr; use `withFrozenCallStack`? does `assertOK` give correct info?
+* what about `HasCallStack` when throwing I2CErr? does `assertOK` give correct info?

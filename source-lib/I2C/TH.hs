@@ -26,6 +26,8 @@ module I2C.TH
   register8,
   register16BE,
   register16LE,
+  register32LE,
+  register64LE,
 
   field,
 
@@ -199,6 +201,42 @@ register16BE name addr def = do
     dReg <- registerN ''Store16BE name addr
     dInstanceDefault <- decInstanceDefault name' def
     dInstanceShow <- decInstanceShow name' 'showBin16
+    pure $ dReg <> [dInstanceDefault, dInstanceShow]
+
+-- | declare a register of Chip that contains Word32 data as Little Endian
+register32LE :: String -> RegisterAddress -> Word32 -> Q [Dec]
+register32LE name addr def = do
+    let name' = mkName name
+    dReg <- registerN ''Store32LE name addr
+    dInstanceDefault <- decInstanceDefault name' def
+    dInstanceShow <- decInstanceShow name' 'showBin32
+    pure $ dReg <> [dInstanceDefault, dInstanceShow]
+
+-- | declare a register of Chip that contains Word32 data as Big Endian
+register32BE :: String -> RegisterAddress -> Word32 -> Q [Dec]
+register32BE name addr def = do
+    let name' = mkName name
+    dReg <- registerN ''Store32BE name addr
+    dInstanceDefault <- decInstanceDefault name' def
+    dInstanceShow <- decInstanceShow name' 'showBin32
+    pure $ dReg <> [dInstanceDefault, dInstanceShow]
+
+-- | declare a register of Chip that contains Word64 data as Little Endian
+register64LE :: String -> RegisterAddress -> Word64 -> Q [Dec]
+register64LE name addr def = do
+    let name' = mkName name
+    dReg <- registerN ''Store64LE name addr
+    dInstanceDefault <- decInstanceDefault name' def
+    dInstanceShow <- decInstanceShow name' 'showBin64
+    pure $ dReg <> [dInstanceDefault, dInstanceShow]
+
+-- | declare a register of Chip that contains Word64 data as Big Endian
+register64BE :: String -> RegisterAddress -> Word64 -> Q [Dec]
+register64BE name addr def = do
+    let name' = mkName name
+    dReg <- registerN ''Store64BE name addr
+    dInstanceDefault <- decInstanceDefault name' def
+    dInstanceShow <- decInstanceShow name' 'showBin64
     pure $ dReg <> [dInstanceDefault, dInstanceShow]
 
 
