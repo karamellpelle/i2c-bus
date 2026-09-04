@@ -7,10 +7,9 @@ module GHCI where
 import Relude 
 import Relude.Extra.Newtype
 import I2C
-import I2C.Internal
 import I2C.Register
 import I2C.Raw
-import I2C.Types
+import I2C.Internal as Internal
 import Data.Default
 import Text.Show qualified
 import Numeric
@@ -148,4 +147,68 @@ print16' a = putTextLn $ toText @String $ printf "%016b" $ un @Word16 a
 
 print8' :: Coercible Word8 a => a -> IO ()
 print8' a = putTextLn $ toText @String $ printf "%08b" $ un @Word8 a
+
+--------------------------------------------------------------------------------
+--  new API
+
+data TemperatureC = TemperatureC Double
+
+instance Show TemperatureC where
+    show (TemperatureC n) = printf "%+ 3.1f °C" n
+
+-- Temperature in degrees C = (TemperatureC Register Value as a signed quantity)/340 + 36.53
+instance Storable TemperatureC where
+    sizeOf a = 2
+    alignment a = 1
+    peek ptr = do
+        n <- peekBE @Int16 $ castPtr ptr
+        pure $ TemperatureC $ (fromIntegral n) / 340.0 + 36.53
+    poke ptr (TemperatureC a) = do
+        pokeBE @Int16 (castPtr ptr) $ truncate $ (a - 36.53) * 340.0
+
+
+
+
+data RegisterM chip t = RegisterM Text RegisterAddress
+
+regreadM :: (Chip chip, Storable t, MonadIO m) => ChipM chip -> RegisterM chip t -> m t
+regreadM (ChipM busdev _) (RegisterM t addr) = 
+    liftIO $ Internal.read busdev addr
+
+regreadM' :: (Chip chip, Storable t, MonadIO m) => BusDevice chip -> RegisterM chip t -> m t
+regreadM' busdev (RegisterM t addr) = 
+    liftIO $ Internal.read busdev addr
+
+
+regwriteM' :: (Chip chip, Storable t, MonadIO m) => BusDevice chip -> RegisterM chip t -> t -> m ()
+regwriteM' busdev (RegisterM t addr) = \t ->
+    liftIO $ Internal.write busdev $ StorableAB addr t
+
+--newtype USER_CTRL = USER_CTRL Store8
+
+regUSER_CTRL :: RegisterM MPU6050 USER_CTRL
+regUSER_CTRL = RegisterM "USER_CTRL" 0x6A
+
+regPWR_MGMT_1 :: RegisterM MPU6050 PWR_MGMT_1
+regPWR_MGMT_1 = RegisterM "PWR_MGMT_1" 0x40
+
+regTEMP_OUT :: RegisterM MPU6050 TemperatureC
+regTEMP_OUT = RegisterM "TEMP_OUT" 0x41
+
+
+testNew :: IO ()
+testNew = do
+    --chip <- openChipM @MPU "/dev/i2c-1" 0x68
+    busdev <- openChip @MPU6050 "/dev/i2c-1"
+
+    regwriteM' busdev regUSER_CTRL  $ def & bitsetFIFO_RESET & bitsetI2C_MST_RESET & bitsetSIG_COND_RESET
+    regwriteM' busdev regPWR_MGMT_1 $ def & setCLKSEL 2 & bitclearSLEEP
+
+    forever $ do
+
+        t <- regreadM' busdev regTEMP_OUT
+        print t
+
+        threadDelay 400000
+
 

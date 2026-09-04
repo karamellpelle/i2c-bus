@@ -21,6 +21,10 @@
 {-# OPTIONS_GHC -Wno-redundant-constraints #-}
 module I2C.Internal.Linux
 (
+    ChipM (..),
+    openChipM,
+    closeChipM,
+
     BusDevice (..),
     openChip,
     closeChip,
@@ -55,6 +59,30 @@ import I2C.Exception
 --    * ioctl(file, I2C_FUNCS, unsigned long *funcs): get functionality
 --    * ioctl(file, I2C_TIMEOUT, unsigned long *funcs): timeout in 10 ms
 --    
+
+data ChipM t = ChipM (BusDevice t) ChipAddress
+
+openChipM :: Text -> ChipAddress -> IO (ChipM t)
+openChipM ident addr = do
+    (try @IOException $ openFd (fromIdentifier ident) ReadWrite defaultFileFlags) >>= \case
+        Left err   -> throwIO $ fromIOException err
+        Right fd   -> do
+            _ <- assertOK (tagErr ident addr) $ c_ioctl (fI fd) cpp_I2C_SLAVE_FORCE (fromChipAddress addr)
+            pure $ ChipM (BusDevice ident (fdToPtrI2C_Client fd)) addr
+    where
+      fromIdentifier = toString
+      --tagErr ident addr = "openChipM: could not find " <> chipName @chip <> " at " <> show addr <> " on bus " <> show ident
+      tagErr ident addr = "openChipM: could not find chip at " <> show addr <> " on bus " <> show ident -- FIXME: show type name 't'!
+      fdToPtrI2C_Client = intPtrToPtr . fromIntegral 
+
+-- | close connection to chip
+closeChipM :: (ChipM t) -> IO ()
+closeChipM (ChipM (BusDevice ident ptr) addr) = do
+    (try @IOException $ closeFd $ ptrI2C_ClientToFd ptr) >>= \case
+        Left err  -> throwIO $ fromIOException err
+        Right _   -> pure ()
+    where
+      ptrI2C_ClientToFd = fromIntegral . ptrToIntPtr 
 
 --------------------------------------------------------------------------------
 --  connection to hardware device on bus
