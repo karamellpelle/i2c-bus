@@ -34,6 +34,8 @@ module I2C.TH
 
     field,
 
+    setDefaults,
+    setPrefixRegister,
 ) where
 
 import Relude hiding (Type)
@@ -42,7 +44,7 @@ import Data.Default
 import Foreign
 import Numeric
 import Text.Show qualified
-import Data.Char (toUpper)
+import Data.Char
 import Data.Bits
 
 import I2C.Types
@@ -60,6 +62,21 @@ import Language.Haskell.TH.Lib
 --  create Chips and Registers through Template Haskell !
 --------------------------------------------------------------------------------
 
+data QSetting = QSetting {
+                qsettingPrefixRegister :: String 
+              --, qsettingShowHex :: Bool
+              }
+
+instance Default QSetting where
+    def = QSetting {
+          qsettingPrefixRegister = "reg"
+        }
+
+-- | restore "factory settings"
+setDefaults :: String -> Q [Dec]
+setDefaults pre = do
+    putQ @QSetting def 
+    pure []
 
 --------------------------------------------------------------------------------
 --  Chip
@@ -171,6 +188,22 @@ registerN tychip addr name def tywrap showf = do
     pure $ [dNewtype, dInstanceDefault, dInstanceShow] <> dRegister
 
 
+-- | change prefix for declared Register values
+setPrefixRegister :: String -> Q [Dec]
+setPrefixRegister pre = do
+    assertValid pre
+    getQ >>= \case 
+        Nothing  -> putQ $ def { qsettingPrefixRegister = pre }
+        Just set -> putQ $ set { qsettingPrefixRegister = pre }
+
+    pure mempty
+    where
+      assertValid = \case 
+        ""      -> fail "Sorry, registers need valid prefix"
+        (c:cs)  -> do
+            when (not $ isAlpha c && isLower c) $ fail "Sorry, registers must at least start with lowercase ASCII"
+            pure () 
+
 --------------------------------------------------------------------------------
 --  fields
 
@@ -274,8 +307,9 @@ mkFunctionName :: String -> Name
 mkFunctionName = mkName 
 
 mkNameRegister :: String -> Q Name
-mkNameRegister name = 
-    pure $ mkName $ "reg" <> name
+mkNameRegister name = do
+    setting <- fmap (fromMaybe def) $ getQ @QSetting
+    pure $ mkName $ qsettingPrefixRegister setting <> name
 
 mkNameType :: String -> Q Name
 mkNameType name = 

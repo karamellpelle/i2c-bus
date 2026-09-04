@@ -40,6 +40,8 @@ import I2C.Chip
 import I2C.Types
 
 
+--------------------------------------------------------------------------------
+--  Register
 
 -- | index to a register of type 't' of a chip 
 data Register chip t = Register Text RegisterAddress
