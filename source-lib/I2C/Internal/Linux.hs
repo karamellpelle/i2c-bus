@@ -50,18 +50,13 @@ import I2C.Chip
 import I2C.Exception
 
 
---   interesting settings: https://github.com/raspberrypi/linux/blob/ae4246632be85a9a7290a33b3d6c89c4ffa17d2b/include/uapi/linux/i2c-dev.h
---    * ioctl(file, I2C_SLAVE, long addr): change slave address
---    * ioctl(file, I2C_FUNCS, unsigned long *funcs): get functionality
---    * ioctl(file, I2C_TIMEOUT, unsigned long *funcs): timeout in 10 ms
---    
-
 --------------------------------------------------------------------------------
 --  connection to hardware device on bus
 
 -- | connection to a hardware device on bus
 data BusDevice chip = 
     BusDevice Text ChipAddress (Ptr I2C_Client) 
+
 
 -- | instance Show
 instance Chip chip => Show (BusDevice chip) where
@@ -211,11 +206,15 @@ assertOK str ma = do
 
 --------------------------------------------------------------------------------
 --  FFI
+--
+--  interesting settings: https://github.com/raspberrypi/linux/blob/ae4246632be85a9a7290a33b3d6c89c4ffa17d2b/include/uapi/linux/i2c-dev.h
+--    * ioctl(file, I2C_SLAVE, long addr): change slave address
+--    * ioctl(file, I2C_FUNCS, unsigned long *funcs): get functionality
+--    * ioctl(file, I2C_TIMEOUT, unsigned long *funcs): timeout in 10 ms
+--    
 
 -- | linux communication
 data I2C_Client
-
---data I2C_Adapter
 
 -- |  > /* Use this slave address, even if it is already in use by a driver! */
 --    > #define I2C_SLAVE_FORCE	0x0706	

@@ -35,7 +35,7 @@ import I2C.Chip
 -- raw read and write without registers
 -- 
 
-rawread :: forall chip a m . (Chip chip, Storable a, MonadIO m) => Internal.BusDevice chip -> m a
+rawread :: forall a chip m . (Chip chip, Storable a, MonadIO m) => Internal.BusDevice chip -> m a
 rawread busdev = liftIO $ 
     Internal.read busdev ()
 
@@ -43,15 +43,15 @@ rawread busdev = liftIO $
 --rawreadSome busdev = liftIO $
 --    Internal.readSome busdev ()
 
-rawwrite :: forall chip a m . (Chip chip, Storable a, MonadIO m)  => Internal.BusDevice chip -> a -> m ()
+rawwrite :: forall a chip m . (Chip chip, Storable a, MonadIO m)  => Internal.BusDevice chip -> a -> m ()
 rawwrite busdev = \w -> liftIO $
     Internal.write busdev w
 
-rawmodify :: forall chip a m . (Chip chip, Storable a, MonadIO m)  => Internal.BusDevice chip -> (a -> a) -> m a
+rawmodify :: forall a chip m . (Chip chip, Storable a, MonadIO m)  => Internal.BusDevice chip -> (a -> a) -> m a
 rawmodify busdev = \f -> liftIO $ do
-    a <- rawread @chip busdev
+    a <- rawread busdev
     let a' = f a
-    rawwrite @chip busdev a'
+    rawwrite busdev a'
     pure a'
 
 

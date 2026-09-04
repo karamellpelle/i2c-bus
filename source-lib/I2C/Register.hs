@@ -64,15 +64,15 @@ regmodify = \busdev reg f -> do
 --------------------------------------------------------------------------------
 --  raw addressing, no Register
 
-regread' :: (Chip chip, Storable a, MonadIO m) => Internal.BusDevice chip -> RegisterAddress -> m a
+regread' :: forall a chip m . (Chip chip, Storable a, MonadIO m) => Internal.BusDevice chip -> RegisterAddress -> m a
 regread' busdev addr = 
     liftIO $ Internal.read busdev addr
 
-regwrite' :: (Chip chip, Storable a, MonadIO m) => Internal.BusDevice chip -> RegisterAddress -> a -> m ()
+regwrite' :: forall a chip m . (Chip chip, Storable a, MonadIO m) => Internal.BusDevice chip -> RegisterAddress -> a -> m ()
 regwrite' busdev addr = \a ->
     liftIO $ Internal.write busdev $ StorableAB addr a
 
-regmodify' :: (Chip chip, Storable a, MonadIO m) => Internal.BusDevice chip -> RegisterAddress -> (a -> a) -> m a
+regmodify' :: forall a chip m . (Chip chip, Storable a, MonadIO m) => Internal.BusDevice chip -> RegisterAddress -> (a -> a) -> m a
 regmodify' = \busdev addr f -> do
     a <- regread' busdev addr
     let a' = f a

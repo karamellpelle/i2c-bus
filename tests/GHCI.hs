@@ -72,7 +72,7 @@ testPCF8575 = do
     busdev <- openChip @PCF8575 "/dev/i2c-1" 0x20
     
     forM_ [0..0x00FF] $ \ix -> do
-        rawwrite @PCF8575 @Word16 busdev ix
+        rawwrite @Word16 busdev ix
         threadDelay 400000
 
 
@@ -126,6 +126,9 @@ testMPU6050 = do
 
         t <- regread busdev regTEMP_OUT
         print t
+
+        --a <- regread' @TemperatureC busdev 0x41
+        --print a
 
         threadDelay 400000
 
