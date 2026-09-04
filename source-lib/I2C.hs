@@ -20,21 +20,23 @@
 module I2C
 (
     
+    I2CErr (..),
     Chip (..),
 
     BusDevice,
     openChip,
     closeChip,
 
-    Register (..),
-
     module I2C.TH,
     module I2C.Types,
+    module I2C.Raw,
+    module I2C.Register,
 ) where
 
 import I2C.Types
+import I2C.Exception
 import I2C.Chip
 import I2C.Internal
-import I2C.Register
 import I2C.Raw
+import I2C.Register
 import I2C.TH
