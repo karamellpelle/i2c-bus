@@ -17,11 +17,17 @@
 -- LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 -- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 -- SOFTWARE.
-{-# LANGUAGE AllowAmbiguousTypes #-}
 module I2C.Register
 (
     Register (..),
 
+    regread,
+    regwrite,
+    regmodify,
+
+    regread',
+    regwrite',
+    regmodify',
 ) where
 
 import Relude
@@ -34,29 +40,42 @@ import I2C.Chip
 import I2C.Types
 
 
+
+-- | index to a register of type 't' of a chip 
+data Register chip t = Register Text RegisterAddress
+
+
+regread :: (Chip chip, Storable a, MonadIO m) => Internal.BusDevice chip -> Register chip a -> m a
+regread busdev (Register _name addr) = 
+    liftIO $ Internal.read busdev addr
+
+regwrite :: (Chip chip, Storable a, MonadIO m) => Internal.BusDevice chip -> Register chip a -> a -> m ()
+regwrite busdev (Register _name addr) = \a ->
+    liftIO $ Internal.write busdev $ StorableAB addr a
+
+regmodify :: (Chip chip, Storable a, MonadIO m) => Internal.BusDevice chip -> Register chip a -> (a -> a) -> m a
+regmodify = \busdev reg f -> do
+    a <- regread busdev reg
+    let a' = f a
+    regwrite busdev reg a'
+    pure a'
+
+
 --------------------------------------------------------------------------------
---  class Register
---
+--  raw addressing, no Register
 
--- | typeclass for a chip's register. 
-class Register reg where
-    -- | register index inside Chip
-    registerAddress :: RegisterAddress
-    -- | human readable name
-    registerName :: Text
-    registerName = "unknown@" <> (show $ registerAddress @reg)
+regread' :: (Chip chip, Storable a, MonadIO m) => Internal.BusDevice chip -> RegisterAddress -> m a
+regread' busdev addr = 
+    liftIO $ Internal.read busdev addr
 
-    -- | type of content in register
-    type RegisterItem reg
+regwrite' :: (Chip chip, Storable a, MonadIO m) => Internal.BusDevice chip -> RegisterAddress -> a -> m ()
+regwrite' busdev addr = \a ->
+    liftIO $ Internal.write busdev $ StorableAB addr a
 
-    -- | bus functions
-    regread   :: (Chip chip, MonadIO m) => Internal.BusDevice chip -> m reg
-    regwrite  :: (Chip chip, MonadIO m) => Internal.BusDevice chip -> reg -> m ()
-    regmodify :: (Chip chip, MonadIO m) => Internal.BusDevice chip -> (reg -> reg) -> m reg
-    regmodify = \busdev f -> do
-        r <- regread busdev
-        let r' = f r
-        regwrite busdev r'
-        pure r'
-
+regmodify' :: (Chip chip, Storable a, MonadIO m) => Internal.BusDevice chip -> RegisterAddress -> (a -> a) -> m a
+regmodify' = \busdev addr f -> do
+    a <- regread' busdev addr
+    let a' = f a
+    regwrite' busdev addr a'
+    pure a'
 

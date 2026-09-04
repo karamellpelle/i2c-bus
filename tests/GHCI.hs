@@ -40,21 +40,22 @@ import Data.Storable.Endian
 
 --------------------------------------------------------------------------------
 -- test data
+$(chip "MYCHIP")
 
-$(register8 "MY8" 0x22 0x83)
+$(register8 ''MYCHIP 0x22 "MY8" 0x83)
 $(field    ''MY8   "A_FIELD"  "0000***0")
 $(field    ''MY8   "A_BIT"    "00*00000")
 
-$(register16LE "MY16" 0x44 0x1122)
-$(field       ''MY16  "B_FIELD"  "00000000000****0")
-$(field       ''MY16  "B_BIT"    "00*0000000000000")
-
-
-a :: MY8
-a = MY8 0b00000110
-
-b :: MY16
-b = MY16 0b0000111100011000
+-- $(register16LE ''MYCHIP 0x44 "MY16" 0x1122)
+-- $(field       ''MY16  "B_FIELD"  "00000000000****0")
+-- $(field       ''MY16  "B_BIT"    "00*0000000000000")
+-- 
+-- 
+-- a :: MY8
+-- a = MY8 0b00000110
+-- 
+-- b :: MY16
+-- b = MY16 0b0000111100011000
 
 
 --------------------------------------------------------------------------------
@@ -82,49 +83,52 @@ testPCF8575 = do
 --  * https://www.invensense.tdk.com/en-us/download-resource/ps-mpu-6000a-00-mpu-6000-and-mpu-6050-datasheet
 --  * https://www.invensense.tdk.com/download-resource/rm-mpu-6000a-00-mpu-6000-and-mpu-6050-register-map-and-descriptions
 
-data TEMP_OUT = TEMP_OUT Double
 
-instance Show TEMP_OUT where
-    show (TEMP_OUT n) = printf "%+ 3.1f °C" n
+data TemperatureC = TemperatureC Double
 
--- Temperature in degrees C = (TEMP_OUT Register Value as a signed quantity)/340 + 36.53
-instance Storable TEMP_OUT where
+instance Show TemperatureC where
+    show (TemperatureC n) = printf "%+ 3.1f °C" n
+
+-- Temperature in degrees C = (TemperatureC Register Value as a signed quantity)/340 + 36.53
+instance Storable TemperatureC where
     sizeOf a = 2
     alignment a = 1
     peek ptr = do
         n <- peekBE @Int16 $ castPtr ptr
-        pure $ TEMP_OUT $ (fromIntegral n) / 340.0 + 36.53
-    poke ptr (TEMP_OUT a) = do
+        pure $ TemperatureC $ (fromIntegral n) / 340.0 + 36.53
+    poke ptr (TemperatureC a) = do
         pokeBE @Int16 (castPtr ptr) $ truncate $ (a - 36.53) * 340.0
 
 
 $(chip "MPU6050")
 
-$(register8 "USER_CTRL" 0x6A 0x00)
+$(register8 ''MPU6050 0x6A "USER_CTRL" 0x00)
 $(field    ''USER_CTRL "FIFO_RESET"      "00000*00")
 $(field    ''USER_CTRL "I2C_MST_RESET"   "000000*0")
 $(field    ''USER_CTRL "SIG_COND_RESET"  "0000000*")
 
-$(register8 "PWR_MGMT_1" 0x6B 0x40)
+$(register8 ''MPU6050 0x6B "PWR_MGMT_1" 0x40)
 $(field    ''PWR_MGMT_1 "CLKSEL"         "00000***")
 $(field    ''PWR_MGMT_1 "SLEEP"          "0*000000")
 
-$(register ''TEMP_OUT 0x41)
+$(register  ''MPU6050 0x41 "TEMP_OUT" ''TemperatureC)
 
 
 testMPU6050 :: IO ()
 testMPU6050 = do
     busdev <- openChip @MPU6050 "/dev/i2c-1" 0x68
 
-    regwrite busdev $ def & bitsetFIFO_RESET & bitsetI2C_MST_RESET & bitsetSIG_COND_RESET
-    regwrite busdev $ def & setCLKSEL 2 & bitclearSLEEP
+    regwrite busdev regUSER_CTRL  $ def & bitsetFIFO_RESET & bitsetI2C_MST_RESET & bitsetSIG_COND_RESET
+    regwrite busdev regPWR_MGMT_1 $ def & setCLKSEL 2 & bitclearSLEEP
 
     forever $ do
 
-        r :: TEMP_OUT <- regread busdev 
-        putTextLn $ show $ un @TEMP_OUT r
+        t <- regread busdev regTEMP_OUT
+        print t
 
         threadDelay 400000
+
+
 
 
 ------------------------------------------------------------------------------
@@ -147,61 +151,4 @@ print16' a = putTextLn $ toText @String $ printf "%016b" $ un @Word16 a
 
 print8' :: Coercible Word8 a => a -> IO ()
 print8' a = putTextLn $ toText @String $ printf "%08b" $ un @Word8 a
-
---------------------------------------------------------------------------------
---  new API
-
-data TemperatureC = TemperatureC Double
-
-instance Show TemperatureC where
-    show (TemperatureC n) = printf "%+ 3.1f °C" n
-
--- Temperature in degrees C = (TemperatureC Register Value as a signed quantity)/340 + 36.53
-instance Storable TemperatureC where
-    sizeOf a = 2
-    alignment a = 1
-    peek ptr = do
-        n <- peekBE @Int16 $ castPtr ptr
-        pure $ TemperatureC $ (fromIntegral n) / 340.0 + 36.53
-    poke ptr (TemperatureC a) = do
-        pokeBE @Int16 (castPtr ptr) $ truncate $ (a - 36.53) * 340.0
-
-
-
-
-data RegisterM chip t = RegisterM Text RegisterAddress
-
-regreadM' :: (Chip chip, Storable t, MonadIO m) => BusDevice chip -> RegisterM chip t -> m t
-regreadM' busdev (RegisterM t addr) = 
-    liftIO $ Internal.read busdev addr
-
-regwriteM' :: (Chip chip, Storable t, MonadIO m) => BusDevice chip -> RegisterM chip t -> t -> m ()
-regwriteM' busdev (RegisterM t addr) = \t ->
-    liftIO $ Internal.write busdev $ StorableAB addr t
-
---newtype USER_CTRL = USER_CTRL Store8
-
-regUSER_CTRL :: RegisterM MPU6050 USER_CTRL
-regUSER_CTRL = RegisterM "USER_CTRL" 0x6A
-
-regPWR_MGMT_1 :: RegisterM MPU6050 PWR_MGMT_1
-regPWR_MGMT_1 = RegisterM "PWR_MGMT_1" 0x40
-
-regTEMP_OUT :: RegisterM MPU6050 TemperatureC
-regTEMP_OUT = RegisterM "TEMP_OUT" 0x41
-
-testNew :: IO ()
-testNew = do
-    busdev <- openChip @MPU6050 "/dev/i2c-1" 0x68
-
-    regwriteM' busdev regUSER_CTRL  $ def & bitsetFIFO_RESET & bitsetI2C_MST_RESET & bitsetSIG_COND_RESET
-    regwriteM' busdev regPWR_MGMT_1 $ def & setCLKSEL 2 & bitclearSLEEP
-
-    forever $ do
-
-        t <- regreadM' busdev regTEMP_OUT
-        print t
-
-        threadDelay 400000
-
 
