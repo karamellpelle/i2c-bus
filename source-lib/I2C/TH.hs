@@ -355,7 +355,7 @@ bitstrToField bitstr =
       strip ix as = case as of
           ('*':as') -> count ix 0 as
           (_:as')   -> strip (succ ix) as'
-          []        -> rest ix ix ix []
+          []        -> Left $ "Field is empty, no * marks at all: " <> bitstr
       count ix len as = case as of
           ('*':as') -> count ix (succ len) as' 
           (_:as')   -> rest ix len (ix + len) as

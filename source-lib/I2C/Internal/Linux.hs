@@ -50,8 +50,9 @@ import I2C.Chip
 import I2C.Exception
 
 
+
 --------------------------------------------------------------------------------
---  connection to hardware device on bus
+--  
 
 -- | connection to a hardware device on bus
 data BusDevice chip = 
@@ -95,6 +96,7 @@ chipTimeoutMs busdev@(BusDevice _id _addr ptr) ms = do
     where
       tagErr = "chipTimeoutMs: could not set timeout to " <> show ms <> " ms on " <> show busdev
       ptrI2C_ClientToFd = fromIntegral . ptrToIntPtr 
+
 
 --------------------------------------------------------------------------------
 --  internal transaction API
@@ -144,6 +146,7 @@ readSome :: forall chip w . (Chip chip, Storable w) => BusDevice chip -> w -> IO
 readSome busdev = \w ->
     throwIO $ errI2C eNOSYS "readSome not implemented on Linux"
 
+
 -- |  write a specific amount of bytes determined by 'Storable w'.
 --      * call shall fail if 'w' can't be written fully.
 write :: forall chip w . (Chip chip, Storable w) => BusDevice chip -> w -> IO ()
@@ -173,27 +176,16 @@ writeSome busdev = \bs ->
     throwIO $ errI2C eNOSYS "writeSome not implemented on Linux"
 
 
--- | maximal number of bytes allowed in a transaction. 
---   note that for 'read' and 'readSome' the size of the write part is included.
---   FIXME: find a suitable value that does not segfault the stack with
---   the call to 'allocaBytesAligned'
+-- | maximal number of bytes allowed in a transaction. note that for 'read' and 
+--   'readSome' the size of the write part is included.
+--   FIXME: find a suitable large value that does not overflow the stack when we
+--          make the call to 'allocaBytes'
 maxTransferSize :: Word
-maxTransferSize = 96
+maxTransferSize = 128
 
 
 fI :: (Integral a, Num b) => a -> b
 fI = fromIntegral
-
-
-
---------------------------------------------------------------------------------
---  FFI
---
---  resources:
---    * https://www.kernel.org/doc/html/latest/i2c/dev-interface.html
---    * https://www.kernel.org/doc/html/latest/driver-api/i2c.html
---    * https://github.com/torvalds/linux/blob/master/drivers/i2c/i2c-core-smbus.c
---
 
 
 -- | handle negative return value as exception (throw I2CErr)
@@ -207,7 +199,11 @@ assertOK str ma = do
 --------------------------------------------------------------------------------
 --  FFI
 --
---  interesting settings: https://github.com/raspberrypi/linux/blob/ae4246632be85a9a7290a33b3d6c89c4ffa17d2b/include/uapi/linux/i2c-dev.h
+--  resources:
+--    * https://www.kernel.org/doc/html/latest/i2c/dev-interface.html
+--    * https://www.kernel.org/doc/html/latest/driver-api/i2c.html
+--
+--  interesting settings (https://github.com/raspberrypi/linux/blob/ae4246632be85a9a7290a33b3d6c89c4ffa17d2b/include/uapi/linux/i2c-dev.h):
 --    * ioctl(file, I2C_SLAVE, long addr): change slave address
 --    * ioctl(file, I2C_FUNCS, unsigned long *funcs): get functionality
 --    * ioctl(file, I2C_TIMEOUT, unsigned long *funcs): timeout in 10 ms
