@@ -24,6 +24,7 @@ import Language.Haskell.TH.Syntax
 import Language.Haskell.TH.Lib
 import Data.Storable.Endian
 
+
 --------------------------------------------------------------------------------
 --
 -- * load ghci (with extra package pretty-simple that provides handy `pPrint` function):
@@ -40,22 +41,22 @@ import Data.Storable.Endian
 
 --------------------------------------------------------------------------------
 -- test data
+
 $(chip "MYCHIP")
 
 $(register8 ''MYCHIP 0x22 "MY8" 0x83)
-$(field    ''MY8   "A_FIELD"  "0000***0")
-$(field    ''MY8   "A_BIT"    "00*00000")
+$(field ''MY8   "A_FIELD"  "0000***0")
+$(field ''MY8   "A_BIT"    "00*00000")
 
--- $(register16LE ''MYCHIP 0x44 "MY16" 0x1122)
--- $(field       ''MY16  "B_FIELD"  "00000000000****0")
--- $(field       ''MY16  "B_BIT"    "00*0000000000000")
--- 
--- 
--- a :: MY8
--- a = MY8 0b00000110
--- 
--- b :: MY16
--- b = MY16 0b0000111100011000
+$(register16LE ''MYCHIP 0x44 "MY16" 0x1122)
+$(field ''MY16  "B_FIELD"  "00000000000****0")
+$(field ''MY16  "B_BIT"    "00*0000000000000")
+
+a :: MY8
+a = MY8 0b00000110
+
+b :: MY16
+b = MY16 0b0000111100011000
 
 
 --------------------------------------------------------------------------------
@@ -74,6 +75,7 @@ testPCF8575 = do
         rawwrite @PCF8575 @Word16 busdev ix
         threadDelay 400000
 
+
 --------------------------------------------------------------------------------
 --  MPU6050
 
@@ -82,7 +84,6 @@ testPCF8575 = do
 --  * https://github.com/adafruit/Adafruit_MPU6050/blob/master/Adafruit_MPU6050.cpp
 --  * https://www.invensense.tdk.com/en-us/download-resource/ps-mpu-6000a-00-mpu-6000-and-mpu-6050-datasheet
 --  * https://www.invensense.tdk.com/download-resource/rm-mpu-6000a-00-mpu-6000-and-mpu-6050-register-map-and-descriptions
-
 
 data TemperatureC = TemperatureC Double
 
@@ -103,13 +104,13 @@ instance Storable TemperatureC where
 $(chip "MPU6050")
 
 $(register8 ''MPU6050 0x6A "USER_CTRL" 0x00)
-$(field    ''USER_CTRL "FIFO_RESET"      "00000*00")
-$(field    ''USER_CTRL "I2C_MST_RESET"   "000000*0")
-$(field    ''USER_CTRL "SIG_COND_RESET"  "0000000*")
+$(field ''USER_CTRL "FIFO_RESET"      "00000*00")
+$(field ''USER_CTRL "I2C_MST_RESET"   "000000*0")
+$(field ''USER_CTRL "SIG_COND_RESET"  "0000000*")
 
 $(register8 ''MPU6050 0x6B "PWR_MGMT_1" 0x40)
-$(field    ''PWR_MGMT_1 "CLKSEL"         "00000***")
-$(field    ''PWR_MGMT_1 "SLEEP"          "0*000000")
+$(field ''PWR_MGMT_1 "CLKSEL"         "00000***")
+$(field ''PWR_MGMT_1 "SLEEP"          "0*000000")
 
 $(register  ''MPU6050 0x41 "TEMP_OUT" ''TemperatureC)
 
@@ -130,7 +131,6 @@ testMPU6050 = do
 
 
 
-
 ------------------------------------------------------------------------------
 -- misc helpers
 --
@@ -145,10 +145,8 @@ print8 a = print8' (fromIntegral a :: Word8)
 print16 :: Integral a => a -> IO ()
 print16 a = print16' (fromIntegral a :: Word16)
 
-
 print16' :: Coercible Word16 a => a -> IO ()
 print16' a = putTextLn $ toText @String $ printf "%016b" $ un @Word16 a
 
 print8' :: Coercible Word8 a => a -> IO ()
 print8' a = putTextLn $ toText @String $ printf "%08b" $ un @Word8 a
-

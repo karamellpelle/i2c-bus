@@ -20,16 +20,19 @@
 {-# LANGUAGE TemplateHaskell #-}
 module I2C.TH
 (
-  chip,
+    chip,
 
-  register,
-  register8,
-  --register16BE,
-  --register16LE,
-  --register32LE,
-  --register64LE,
+    register,
 
-  field,
+    register8,
+    register16LE,
+    register16BE,
+    register32LE,
+    register32BE,
+    register64LE,
+    register64BE,
+
+    field,
 
 ) where
 
@@ -93,7 +96,13 @@ chip name = do
 
 
 -- | declare a register of Chip from Storable type. 
---   Storable is relative to I2C chip data
+--   Storable is relative to the chip's hardware
+--
+--  $(register ''MPU6050 0x41 "TEMP_OUT" ''TemperatureC)
+--  ======>
+--    regTEMP_OUT :: Register MPU6050 TemperatureC
+--    regTEMP_OUT = Register "TEMP_OUT" 65
+--
 register :: Name -> RegisterAddress -> String -> Name -> Q [Dec]
 register tychip addr name ty = do
     regname <- mkNameRegister name
@@ -101,54 +110,71 @@ register tychip addr name ty = do
           , ValD (VarP regname) (NormalB (AppE (AppE (ConE 'Register) (LitE (StringL name))) (LitE (IntegerL $ fromRegisterAddress addr)))) []
           ]
 
---[SigD regUSER_CTRL_0 (AppT (AppT (ConT Ghci4.Register) (ConT Ghci1.MPU6050)) (ConT Ghci2.USER_CTRL)),ValD (VarP regUSER_CTRL_0) (NormalB (AppE (AppE (ConE Ghci4.Register) (LitE (StringL "USER_CTRL"))) (LitE (IntegerL 106)))) []]
-
-
--- $(register8 ''QN8066 0x20 "TEMP_OUT" 0x02)
-
----- | declare a register of Chip from a numerice type. 
---registerN :: Name -> Name -> Name -> RegisterAddress -> Q [Dec]
---registerN tychip tywrap name addr = do
---    ty <- mkNameType name
---    dNewtype <- decNewtype ty tywrap [''Storable, ''Eq]
---    dRegister <- register tychip addr name ty
---    pure [dNewtype, dRegister]
-    
-    
 
 -- | declare a register of Chip that contains Word8 data
 --
---
+--  $(register8 ''MYCHIP 0x22 "MY8" 0x83)
+--  ======>
+--    newtype MY8
+--      = MY8 Store8
+--      deriving Storable
+--      deriving Eq
+--    instance Default MY8 where
+--      def = MY8 131
+--    instance Show MY8 where
+--      Text.Show.show = I2C.TH.showRegT8Bin "MY8"
+--    regMY8 :: Register MYCHIP MY8
+--    regMY8 = Register "MY8" 34
 register8 :: Name -> RegisterAddress -> String -> Word8 -> Q [Dec]
-register8 tychip addr name def = do
+register8 tychip addr name def =
+    registerN tychip addr name def ''Store8 'showRegT8Bin
+    
+
+-- | declare a register of Chip that contains Word16 data as Little Endian
+register16LE :: Name -> RegisterAddress -> String -> Word16 -> Q [Dec]
+register16LE tychip addr name def =
+    registerN tychip addr name def ''Store16LE 'showRegT16Hex
+
+-- | declare a register of Chip that contains Word16 data as Big Endian
+register16BE :: Name -> RegisterAddress -> String -> Word16 -> Q [Dec]
+register16BE tychip addr name def =
+    registerN tychip addr name def ''Store16BE 'showRegT16Hex
+
+-- | declare a register of Chip that contains Word32 data as Little Endian
+register32LE :: Name -> RegisterAddress -> String -> Word32 -> Q [Dec]
+register32LE tychip addr name def =
+    registerN tychip addr name def ''Store32LE 'showRegT32Hex
+
+-- | declare a register of Chip that contains Word32 data as Big Endian
+register32BE :: Name -> RegisterAddress -> String -> Word32 -> Q [Dec]
+register32BE tychip addr name def =
+    registerN tychip addr name def ''Store32BE 'showRegT32Hex
+
+-- | declare a register of Chip that contains Word64 data as Little Endian
+register64LE :: Name -> RegisterAddress -> String -> Word64 -> Q [Dec]
+register64LE tychip addr name def =
+    registerN tychip addr name def ''Store64LE 'showRegT64Hex
+
+-- | declare a register of Chip that contains Word64 data as Big Endian
+register64BE :: Name -> RegisterAddress -> String -> Word64 -> Q [Dec]
+register64BE tychip addr name def =
+    registerN tychip addr name def ''Store64BE 'showRegT64Hex
+
+
+registerN :: Integral n => Name -> RegisterAddress -> String -> n -> Name -> Name -> Q [Dec]
+registerN tychip addr name def tywrap showf = do
     ty <- mkNameType name
-    dNewtype <- decNewtype ty ''Store8 [''Storable, ''Eq]
+    dNewtype <- decNewtype ty tywrap [''Storable, ''Eq]
     dInstanceDefault <- decInstanceDefault ty def
-    --dInstanceShow <- decInstanceShow ty 'showBin8
-    dInstanceShow <- decInstanceShow ty 'undefined
+    dInstanceShow <- decInstanceShowRegT name ty showf
     dRegister <- register tychip addr name ty
     pure $ [dNewtype, dInstanceDefault, dInstanceShow] <> dRegister
 
-{-
--- | declare a register of Chip that contains Word16 data as Little Endian
---
-
--- | declare a register of Chip that contains Word16 data as Big Endian
-
--- | declare a register of Chip that contains Word32 data as Little Endian
-
--- | declare a register of Chip that contains Word32 data as Big Endian
-
--- | declare a register of Chip that contains Word64 data as Little Endian
-
--- | declare a register of Chip that contains Word64 data as Big Endian
-
--}
 
 --------------------------------------------------------------------------------
 --  fields
 
--- | declare a (sub)field of a register 
+-- | declare a field of a register; take a part of a register and make a type
 --
 --   $(field ''MYREG8 "VALUES" "00***000")
 --   ======>
@@ -230,11 +256,16 @@ field ty name bitstr = case bitstrToField bitstr of
                       , ValD (VarP funname) (NormalB (AppE (AppTypeE (VarE 'under) (ConT tywrap)) (AppE (AppE (VarE 'flip) (VarE underF)) ixE)))
                       []]
 
--- 3 => 0b0111
+
+--------------------------------------------------------------------------------
+--  helpers
+
+-- example: 3 -> 0b00000111
 mkMaskN :: Word -> Integer
 mkMaskN n = 
     shiftL 0b1 (fromIntegral n) - 1
 
+-- example: 1 3 -> 0b00001110 
 mkMaskIxLen :: Word -> Word -> Integer
 mkMaskIxLen ix len = 
     shiftL (shiftL 0b1 (fromIntegral len) - 1) (fromIntegral ix)
@@ -250,8 +281,6 @@ mkNameType :: String -> Q Name
 mkNameType name = 
     pure $ mkName $ name
 
---------------------------------------------------------------------------------
---  helpers
 
 decInstanceDefault :: Integral value => Name -> value -> Q Dec
 decInstanceDefault tname v = do
@@ -259,9 +288,9 @@ decInstanceDefault tname v = do
         dDef = funD 'def $ one $ clause [] (normalB $ appE (conE tname) (litE $ integerL $ toInteger v)) []
     instanceD (cxt []) (appT (conT ''Default) (conT tname)) [dDef]
 
-decInstanceShow :: Name -> Name -> Q Dec
-decInstanceShow ty f =
-    instanceD (cxt []) (appT (conT ''Show) (conT ty)) $ one $ decFunctionAssign 'Text.Show.show f
+decInstanceShowRegT :: String -> Name -> Name -> Q Dec
+decInstanceShowRegT name ty showf =
+    pure $ InstanceD Nothing [] (AppT (ConT ''Text.Show.Show) (ConT ty)) [ValD (VarP 'Text.Show.show) (NormalB (AppE (VarE showf) (LitE (StringL name)))) []]
 
 decNewtype :: Name -> Name -> [Name] -> Q Dec
 decNewtype tname tname' tderivs = 
@@ -306,47 +335,43 @@ bitstrToField bitstr =
 --------------------------------------------------------------------------------
 --  shows
 
+showRegT8Bin :: (Coercible Word8 a) => String -> a -> String
+showRegT8Bin name a =
+    name <> "(" <> showBinN 8 (un @Word8 a) <> ")"
 
----- | FIXME: rewrite with name
---showBin8 :: (Coercible Word8 a) => a -> String
---showBin8 name a = name <> "(" <> showBinN 8 (un @Word8 reg) <> ")"
+showRegT16Bin :: (Coercible Word16 a) => String -> a -> String
+showRegT16Bin name a =
+    name <> "(" <> showBinN 16 (un @Word16 a) <> ")"
+    
+showRegT32Bin :: (Coercible Word32 a) => String -> a -> String
+showRegT32Bin name a =
+    name <> "(" <> showBinN 32 (un @Word32 a) <> ")"
+    
+showRegT64Bin :: (Coercible Word64 a) => String -> a -> String
+showRegT64Bin name a =
+    name <> "(" <> showBinN 64 (un @Word64 a) <> ")"
+    
+    
+showRegT8Hex :: (Coercible Word8 a) => String -> a -> String
+showRegT8Hex name a =
+    name <> "(" <> showHexN 2 (un @Word8 a) <> ")"
+    
+showRegT16Hex :: (Coercible Word16 a) => String -> a -> String
+showRegT16Hex name a =
+    name <> "(" <> showHexN 4 (un @Word16 a) <> ")"
+    
+showRegT32Hex :: (Coercible Word32 a) => String -> a -> String
+showRegT32Hex name a =
+    name <> "(" <> showHexN 8 (un @Word32 a) <> ")"
 
-{-
-showHex8 :: forall reg . (Register reg, Coercible Word8 reg) => reg -> String
-showHex8 reg = 
-    (toString $ registerName @reg) <> "(" <> showWordN 2 (un @Word8 reg) <> ")"
+showRegT64Hex :: (Coercible Word64 a) => String -> a -> String
+showRegT64Hex name a =
+    name <> "(" <> showHexN 16 (un @Word64 a) <> ")"
+    
 
-showHex16 :: forall reg . (Register reg, Coercible Word16 reg) => reg -> String
-showHex16 reg = 
-    (toString $ registerName @reg) <> "(" <> showWordN 4 (un @Word16 reg) <> ")"
-
-showHex32 :: forall reg . (Register reg, Coercible Word32 reg) => reg -> String
-showHex32 reg = 
-    (toString $ registerName @reg) <> "(" <> showWordN 8 (un @Word32 reg) <> ")"
-
-showHex64 :: forall reg . (Register reg, Coercible Word64 reg) => reg -> String
-showHex64 reg = 
-    (toString $ registerName @reg) <> "(" <> showWordN 16 (un @Word64 reg) <> ")"
-
-showBin8 :: forall reg . (Register reg, Coercible Word8 reg) => reg -> String
-showBin8 reg = 
-    (toString $ registerName @reg) <> "(" <> showBinN 8 (un @Word8 reg) <> ")"
-
-showBin16 :: forall reg . (Register reg, Coercible Word16 reg) => reg -> String
-showBin16 reg = 
-    (toString $ registerName @reg) <> "(" <> showBinN 16 (un @Word16 reg) <> ")"
-
-showBin32 :: forall reg . (Register reg, Coercible Word32 reg) => reg -> String
-showBin32 reg = 
-    (toString $ registerName @reg) <> "(" <> showBinN 32 (un @Word32 reg) <> ")"
-
-showBin64 :: forall reg . (Register reg, Coercible Word64 reg) => reg -> String
-showBin64 reg = 
-    (toString $ registerName @reg) <> "(" <> showBinN 64 (un @Word64 reg) <> ")"
-
--}
-showWordN :: Integral a => Int -> a -> String
-showWordN n w =
+    
+showHexN :: Integral a => Int -> a -> String
+showHexN n w =
     let str = fmap toUpper $ showHex w ""
         n'  = if length str <= n then n - length str else 0
     in replicate n' '0' <> str
