@@ -61,20 +61,19 @@ import Language.Haskell.TH.Lib
 --------------------------------------------------------------------------------
 --  Chip
 
--- | declare a Chip with name 'name' at _7_ bit bus address 'addr'
+-- | declare a Chip with name 'name' 
 --
---  $(chip "Chip123" 0x22)
+--    chip "MYCHIP"
 --  ======>
---    data Chip123 deriving Show
---    instance Chip Chip123 where
---      chipAddress = 34
---      chipName = "Chip123"
+--    data MYCHIP deriving Show
+--    instance Chip MYCHIP where
+--      chipName = "MYCHIP"
 --
-chip :: String -> ChipAddress -> Q [Dec]
-chip name addr = do
+chip :: String -> Q [Dec]
+chip name = do
     let name' = mkName name
     dData <- decData name' 
-    dInstance <- decInstance name' addr
+    dInstance <- decInstance name' 
     pure [dData, dInstance]
     
     where
@@ -82,13 +81,11 @@ chip name addr = do
       decData tname = 
           dataD (cxt []) tname [] Nothing [] $ one $ derivClause Nothing $ [conT $ ''Show] 
 
-      decInstance :: Name -> ChipAddress -> Q Dec
-      decInstance tname addr = do
-          let dAddress :: Q Dec
-              dAddress = funD 'chipAddress $ one $ clause [] (normalB $ litE $ integerL $ fromChipAddress addr) []
-              dName :: Q Dec
+      decInstance :: Name -> Q Dec
+      decInstance tname = do
+          let dName :: Q Dec
               dName = funD 'chipName $ one $ clause [] (normalB $ litE $ stringL $ nameBase tname ) []
-          instanceD (cxt []) (appT (conT ''Chip) (conT tname)) [dAddress, dName]
+          instanceD (cxt []) (appT (conT ''Chip) (conT tname)) [dName]
 
 
 --------------------------------------------------------------------------------

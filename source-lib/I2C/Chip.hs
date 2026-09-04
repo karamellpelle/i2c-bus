@@ -35,9 +35,7 @@ import I2C.Types
 
 -- | typeclass for I2C chips
 class Chip chip where
-    -- | _7 bit_ address on I2C bus, i.e. the 8 bit R/W addresses shifted down by 1
-    chipAddress :: ChipAddress
     -- | human readable identifier
     chipName :: Text
-    chipName = "unknown@" <> (show $ chipAddress @chip)
+    chipName = "(unknown chip)"
 

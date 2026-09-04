@@ -21,10 +21,6 @@
 {-# OPTIONS_GHC -Wno-redundant-constraints #-}
 module I2C.Internal.Linux
 (
-    ChipM (..),
-    openChipM,
-    closeChipM,
-
     BusDevice (..),
     openChip,
     closeChip,
@@ -60,61 +56,35 @@ import I2C.Exception
 --    * ioctl(file, I2C_TIMEOUT, unsigned long *funcs): timeout in 10 ms
 --    
 
-data ChipM t = ChipM (BusDevice t) ChipAddress
-
-openChipM :: Text -> ChipAddress -> IO (ChipM t)
-openChipM ident addr = do
-    (try @IOException $ openFd (fromIdentifier ident) ReadWrite defaultFileFlags) >>= \case
-        Left err   -> throwIO $ fromIOException err
-        Right fd   -> do
-            _ <- assertOK (tagErr ident addr) $ c_ioctl (fI fd) cpp_I2C_SLAVE_FORCE (fromChipAddress addr)
-            pure $ ChipM (BusDevice ident (fdToPtrI2C_Client fd)) addr
-    where
-      fromIdentifier = toString
-      --tagErr ident addr = "openChipM: could not find " <> chipName @chip <> " at " <> show addr <> " on bus " <> show ident
-      tagErr ident addr = "openChipM: could not find chip at " <> show addr <> " on bus " <> show ident -- FIXME: show type name 't'!
-      fdToPtrI2C_Client = intPtrToPtr . fromIntegral 
-
--- | close connection to chip
-closeChipM :: (ChipM t) -> IO ()
-closeChipM (ChipM (BusDevice ident ptr) addr) = do
-    (try @IOException $ closeFd $ ptrI2C_ClientToFd ptr) >>= \case
-        Left err  -> throwIO $ fromIOException err
-        Right _   -> pure ()
-    where
-      ptrI2C_ClientToFd = fromIntegral . ptrToIntPtr 
-
 --------------------------------------------------------------------------------
 --  connection to hardware device on bus
 
 -- | connection to a hardware device on bus
 data BusDevice chip = 
-    BusDevice Text (Ptr I2C_Client)
-
+    BusDevice Text ChipAddress (Ptr I2C_Client) 
 
 -- | instance Show
 instance Chip chip => Show (BusDevice chip) where
-    show (BusDevice id addr) = "(BusDevice " <> (toString $ chipName @chip) <> " " <> show addr <> "@" <> toString id <> ")"
+    show (BusDevice id addr _ptr) = "(BusDevice " <> (toString $ chipName @chip) <> " " <> show addr <> "@" <> toString id <> ")"
 
 
--- | opens a connection to chip based on bus identifier.
-openChip :: forall chip . (Chip chip) => Text -> IO (BusDevice chip)
-openChip ident = do
-    (try @IOException $ openFd (fromIdentifier ident) ReadWrite defaultFileFlags) >>= \case
+-- | opens a connection to chip based on bus identifier and hardware address
+openChip :: forall chip . (Chip chip) => Text -> ChipAddress -> IO (BusDevice chip)
+openChip busid addr = do
+    (try @IOException $ openFd (fromIdentifier busid) ReadWrite defaultFileFlags) >>= \case
         Left err   -> throwIO $ fromIOException err
         Right fd   -> do
-            let addr = chipAddress @chip
-            _ <- assertOK (tagErr ident addr) $ c_ioctl (fI fd) cpp_I2C_SLAVE_FORCE (fromChipAddress addr)
-            pure $ BusDevice @chip ident $ fdToPtrI2C_Client fd
+            _ <- assertOK (tagErr busid addr) $ c_ioctl (fI fd) cpp_I2C_SLAVE_FORCE (fromChipAddress addr)
+            pure $ BusDevice busid addr $ fdToPtrI2C_Client fd
     where
       fromIdentifier = toString
-      tagErr ident addr = "openChip: could not find " <> chipName @chip <> " at " <> show addr <> " on bus " <> show ident
+      tagErr busid addr = "openChip: could not find " <> chipName @chip <> " at " <> show addr <> " on bus " <> show busid
       fdToPtrI2C_Client = intPtrToPtr . fromIntegral 
 
 
 -- | close connection to chip
 closeChip :: forall chip . (Chip chip) => BusDevice chip -> IO ()
-closeChip (BusDevice _id ptr) = do
+closeChip (BusDevice _id _addr ptr) = do
     (try @IOException $ closeFd $ ptrI2C_ClientToFd ptr) >>= \case
         Left err  -> throwIO $ fromIOException err
         Right _   -> pure ()
@@ -124,7 +94,7 @@ closeChip (BusDevice _id ptr) = do
 
 -- | set timeout for transfers
 chipTimeoutMs :: forall chip . (Chip chip) => BusDevice chip -> Word -> IO ()
-chipTimeoutMs busdev@(BusDevice _id ptr) ms = do
+chipTimeoutMs busdev@(BusDevice _id _addr ptr) ms = do
     _ <- assertOK tagErr $ c_ioctl (ptrI2C_ClientToFd ptr) cpp_I2C_TIMEOUT $ fromIntegral $ div ms 10
     pure ()
     where
@@ -145,7 +115,7 @@ chipTimeoutMs busdev@(BusDevice _id ptr) ms = do
 --
 read :: forall chip w r . (Chip chip, Storable w, Storable r)  => 
         BusDevice chip -> w -> IO r
-read busdev@(BusDevice _id ptr) = \w -> do
+read busdev@(BusDevice _id addr ptr) = \w -> do
     let sizeW = sizeOf w 
         sizeR = sizeOf (undefined :: r)
     when (maxTransferSize < (fI $ max sizeW sizeR)) $ throwIO $ errI2C eNOMEM $ tagErr busdev
@@ -154,7 +124,7 @@ read busdev@(BusDevice _id ptr) = \w -> do
     res <- try @IOException $ allocaBytes @Word8 (max sizeW sizeR) $ \mem -> do
         -- set write data. this data will be overwritten after reading
         poke (castPtr mem) w
-        _ <- assertOK (tagErr busdev) $ c_i2c_read ptr (fromChipAddress $ chipAddress @chip) mem (fI sizeW) mem (fI sizeR)
+        _ <- assertOK (tagErr busdev) $ c_i2c_read ptr (fromChipAddress addr) mem (fI sizeW) mem (fI sizeR)
         peek $ castPtr mem
 
     case res of
@@ -182,13 +152,13 @@ readSome busdev = \w ->
 -- |  write a specific amount of bytes determined by 'Storable w'.
 --      * call shall fail if 'w' can't be written fully.
 write :: forall chip w . (Chip chip, Storable w) => BusDevice chip -> w -> IO ()
-write busdev@(BusDevice _id ptr) = \w -> do
+write busdev@(BusDevice _id addr ptr) = \w -> do
     let sizeW = sizeOf w 
     when (maxTransferSize < (fI sizeW)) $ throwIO $ errI2C eNOMEM $ tagErr busdev
 
     res <- try @IOException $ allocaBytes @Word8 sizeW $ \mem -> do
         poke (castPtr mem) w
-        _ <- assertOK (tagErr busdev) $ c_i2c_write ptr (fromChipAddress $ chipAddress @chip) mem (fI sizeW)
+        _ <- assertOK (tagErr busdev) $ c_i2c_write ptr (fromChipAddress addr) mem (fI sizeW)
         pure ()
     case res of
         Right a   -> pure a

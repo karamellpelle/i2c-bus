@@ -63,11 +63,11 @@ b = MY16 0b0000111100011000
 -- this is a GPIO expander chip with 2 bytes => 16 pins
 -- (no registers, only write and read 2 bytes)
 --  * https://www.ti.com/lit/ds/symlink/pcf8575.pdf
-$(chip "PCF8575" 0x20)
+$(chip "PCF8575")
 
 testPCF8575 :: IO ()
 testPCF8575 = do
-    busdev <- openChip @PCF8575 "/dev/i2c-1"
+    busdev <- openChip @PCF8575 "/dev/i2c-1" 0x20
     
     forM_ [0..0x00FF] $ \ix -> do
         rawwrite @PCF8575 @Word16 busdev ix
@@ -98,7 +98,7 @@ instance Storable TEMP_OUT where
         pokeBE @Int16 (castPtr ptr) $ truncate $ (a - 36.53) * 340.0
 
 
-$(chip "MPU6050" 0x68)
+$(chip "MPU6050")
 
 $(register8 "USER_CTRL" 0x6A 0x00)
 $(field    ''USER_CTRL "FIFO_RESET"      "00000*00")
@@ -114,7 +114,7 @@ $(register ''TEMP_OUT 0x41)
 
 testMPU6050 :: IO ()
 testMPU6050 = do
-    busdev <- openChip @MPU6050 "/dev/i2c-1"
+    busdev <- openChip @MPU6050 "/dev/i2c-1" 0x68
 
     regwrite busdev $ def & bitsetFIFO_RESET & bitsetI2C_MST_RESET & bitsetSIG_COND_RESET
     regwrite busdev $ def & setCLKSEL 2 & bitclearSLEEP
@@ -171,14 +171,9 @@ instance Storable TemperatureC where
 
 data RegisterM chip t = RegisterM Text RegisterAddress
 
-regreadM :: (Chip chip, Storable t, MonadIO m) => ChipM chip -> RegisterM chip t -> m t
-regreadM (ChipM busdev _) (RegisterM t addr) = 
-    liftIO $ Internal.read busdev addr
-
 regreadM' :: (Chip chip, Storable t, MonadIO m) => BusDevice chip -> RegisterM chip t -> m t
 regreadM' busdev (RegisterM t addr) = 
     liftIO $ Internal.read busdev addr
-
 
 regwriteM' :: (Chip chip, Storable t, MonadIO m) => BusDevice chip -> RegisterM chip t -> t -> m ()
 regwriteM' busdev (RegisterM t addr) = \t ->
@@ -195,11 +190,9 @@ regPWR_MGMT_1 = RegisterM "PWR_MGMT_1" 0x40
 regTEMP_OUT :: RegisterM MPU6050 TemperatureC
 regTEMP_OUT = RegisterM "TEMP_OUT" 0x41
 
-
 testNew :: IO ()
 testNew = do
-    --chip <- openChipM @MPU "/dev/i2c-1" 0x68
-    busdev <- openChip @MPU6050 "/dev/i2c-1"
+    busdev <- openChip @MPU6050 "/dev/i2c-1" 0x68
 
     regwriteM' busdev regUSER_CTRL  $ def & bitsetFIFO_RESET & bitsetI2C_MST_RESET & bitsetSIG_COND_RESET
     regwriteM' busdev regPWR_MGMT_1 $ def & setCLKSEL 2 & bitclearSLEEP

@@ -48,7 +48,7 @@ import Data.Char (toUpper)
 --------------------------------------------------------------------------------
 --  chip address
 
--- | hardware's address on bus
+-- | hardware's _7 bit_ address on I2C bus, i.e. the 8 bit R/W addresses shifted down by 1
 newtype ChipAddress = ChipAddress Word8
     deriving (Num)
 
