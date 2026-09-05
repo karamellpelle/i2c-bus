@@ -245,8 +245,8 @@ field ty name bitstr = case bitstrToField bitstr of
 
         assertCorrectSize size tywrap'
 
-        dGet <- decGet tywrap ty tycon sil
-        dSet <- decSet tywrap ty tycon sil
+        dGet <- decGet tywrap' tywrap ty tycon sil
+        dSet <- decSet tywrap' tywrap ty tycon sil
         dBit <- if len == 1 then decBit tywrap ty sil else mempty
 
         pure $ dGet <> dSet <> dBit
@@ -258,18 +258,18 @@ field ty name bitstr = case bitstrToField bitstr of
                                   | ty == ''Word64  = when (size /= 64) $ fail $ "Bitstring " <> bitstr <> " doesn't match expected size 64 (got " <> show size <> ")"
                                   | otherwise       = fail $ "Didn't expect type " <> show ty
 
-        decGet tywrap ty tycon (size, ix, len) = do
+        decGet tywrap' tywrap ty tycon (size, ix, len) = do
             let funname = mkFunctionName $ "get" <> name  
                 maskE = LitE $ IntegerL $ mkMaskN len 
             n <- newName "n" 
             w <- newName "w" 
 
-            pure  [ SigD funname (ForallT [] [AppT (ConT ''Integral) (VarT n)] (AppT (AppT ArrowT (ConT ty)) (VarT n)))
+            pure  [ SigD funname (AppT (AppT ArrowT (ConT ty)) (ConT tywrap'))
                   , ValD (VarP funname) (NormalB (LamE [VarP w] (InfixE (Just (VarE 'fromIntegral)) (VarE '($)) (Just (InfixE (Just (AppE (AppE (VarE 'unsafeShiftR) 
                   (AppE (AppTypeE (VarE 'un) (ConT tywrap)) (VarE w))) (LitE (IntegerL $ fromIntegral ix)))) (VarE '(.&.)) (Just maskE)))))) []
                   ]
 
-        decSet tywrap ty tycon (size, ix, len) = do
+        decSet tywrap' tywrap ty tycon (size, ix, len) = do
             let funname = mkFunctionName $ "set" <> name  
                 maskE0 = LitE $ IntegerL $ mkMaskIxLen ix len 
                 maskE1 = LitE $ IntegerL $ mkMaskN len 
@@ -277,7 +277,7 @@ field ty name bitstr = case bitstrToField bitstr of
             n <- newName "n" 
             w <- newName "w" 
             
-            pure  [ SigD funname (ForallT [] [AppT (ConT ''Integral) (VarT n)] (AppT (AppT ArrowT (VarT n)) (AppT (AppT ArrowT (ConT ty)) (ConT ty))))
+            pure  [ SigD funname (AppT (AppT ArrowT (ConT tywrap')) (AppT (AppT ArrowT (ConT ty)) (ConT ty)))
                   , ValD (VarP funname) (NormalB (LamE [VarP n] (InfixE (Just (AppTypeE (VarE 'under) (ConT tywrap))) (VarE '($)) (Just (LamE [VarP w] (InfixE (Just (InfixE (Just (VarE w)) (VarE '(.&.)) (Just (AppE (VarE 'complement) (maskE0))))) (VarE '(.|.)) (Just (AppE (AppE (VarE 'unsafeShiftL) (InfixE (Just maskE1) (VarE '(.&.)) (Just (AppE (VarE 'fromIntegral) (VarE n))))) ixE)))))))) []
                   ]
 
