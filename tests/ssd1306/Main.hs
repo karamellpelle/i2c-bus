@@ -33,7 +33,7 @@ import Foreign
 --  hardware
 
 address :: ChipAddress
-address = 0x3D
+address = 0x3C
 
 width :: Word
 width = 128
@@ -95,7 +95,7 @@ instance Storable Command where
         SegRemapOn                -> poke' 0xA1 nop nop
         ComRemapOff               -> poke' 0xC0 nop nop
         ComRemapOn                -> poke' 0xC8 nop nop
-        ComPins alt lr            -> poke' 0xDA ( 0b00000010 .|. (if alt then 0b000100000 else 0) .|. (if lr then 0b00100000 else 0) ) nop
+        ComPins alt lr            -> poke' 0xDA ( 0b00000010 .|. (if alt then 0b00010000 else 0) .|. (if lr then 0b00100000 else 0) ) nop
         SetContrast hex           -> poke' 0x81 hex nop
         PreCharge n               -> poke' 0xD9 n nop
         PageAddr start end        -> poke' 0x22 start end
@@ -122,7 +122,9 @@ instance Storable ImageOLED where
     alignment _ = 1
     peek ptr = pure ImageOLED
     poke ptr img = do
-
+        let bytes = sizeOf ImageOLED
+        forM_ [0..bytes - 1] $ \ix -> do
+            pokeByteOff @Word8 ptr ix $ fromIntegral ix
         --uint16_t count = WIDTH * ((HEIGHT + 7) / 8);
         --uint8_t *ptr = buffer;
         --if (wire) { // I2C
@@ -161,8 +163,6 @@ ssd1306Init ssd1306 = do
       -- create buffer
       -- clear bitmap
 
-
-
     regwrite ssd1306 regCOMMAND $ DisplayOff
 
     regwrite ssd1306 regCOMMAND $ DisplayClockDiv 0x80
@@ -173,13 +173,13 @@ ssd1306Init ssd1306 = do
 
     regwrite ssd1306 regCOMMAND $ SetStartLine 0
 
-    regwrite ssd1306 regCOMMAND $ ChargePump $ if vccExternal then 0x10 else 0x144
+    regwrite ssd1306 regCOMMAND $ ChargePump $ if vccExternal then 0x10 else 0x14
 
     -- memory mode 
     -- * 0b00: Horizontal: 
     --    increase column address pointer for each written byte. when pointer equals
     --    column end address, set pointer to 0 and increase page address pointer
-    regwrite ssd1306 regCOMMAND $ MemoryMode 0b00 -- 0x00 : increase columns, if 
+    regwrite ssd1306 regCOMMAND $ MemoryMode 0b00 
 
     regwrite ssd1306 regCOMMAND $ SegRemapOn
 
@@ -188,10 +188,10 @@ ssd1306Init ssd1306 = do
     --if ((WIDTH == 128) && (HEIGHT == 32)) {
     --  comPins = 0x02;
     --  contrast = 0x8F;
-    regwrite ssd1306 regCOMMAND $ ComPins False True
+    regwrite ssd1306 regCOMMAND $ ComPins False False
     regwrite ssd1306 regCOMMAND $ SetContrast 0x8F
 
-    regwrite ssd1306 regCOMMAND $  PreCharge $ if vccExternal then 0x22 else 0xF1
+    regwrite ssd1306 regCOMMAND $ PreCharge $ if vccExternal then 0x22 else 0xF1
 
     regwrite ssd1306 regCOMMAND $ VComh 0x40
 
@@ -230,10 +230,10 @@ ssd1306Clear = undefined
 main :: IO ()
 main = do
     ssd1306 <- openChip "/dev/i2c-1" address
-    img <- loadImageOLED "tests/ssd1306/image-128x32.png"
+    --img <- loadImageOLED "tests/ssd1306/image-128x32.png"
 
     ssd1306Init  ssd1306
-    ssd1306Clear ssd1306
-    ssd1306Image ssd1306 img
+    --ssd1306Clear ssd1306
+    ssd1306Image ssd1306 $ ImageOLED
     
 
