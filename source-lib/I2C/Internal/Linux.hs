@@ -115,10 +115,10 @@ read :: forall chip w r . (Chip chip, Storable w, Storable r)  =>
 read busdev@(BusDevice _id addr ptr) = \w -> do
     let sizeW = sizeOf w 
         sizeR = sizeOf (undefined :: r)
-    when (maxTransferSize < (fI $ max sizeW sizeR)) $ throwIO $ errI2C eNOMEM $ tagErr busdev
+        size = max sizeW sizeR
+        withMem = if size <= maxAllocaBytes then allocaBytes else mallocBytes'
 
-
-    res <- try @IOException $ allocaBytes @Word8 (max sizeW sizeR) $ \mem -> do
+    res <- try @IOException $ withMem size $ \mem -> do
         -- set write data. this data will be overwritten after reading
         poke (castPtr mem) w
         _ <- assertOK (tagErr busdev) $ c_i2c_read ptr (fromChipAddress addr) mem (fI sizeW) mem (fI sizeR)
@@ -130,8 +130,8 @@ read busdev@(BusDevice _id addr ptr) = \w -> do
 
     where
       tagErr busdev = "Internal.read " <> show busdev
+      mallocBytes' size f = bracket (mallocBytes size) free f
     
-
 -- |  read an arbitrary amount of bytes until NACK by slave. the reading
 --    can be prefixed by a write of a specific amount of bytes determined by
 --    'Storable w' if and only if 'sizeOf w' is non-zero. it is very
@@ -151,18 +151,19 @@ readSome busdev = \w ->
 --      * call shall fail if 'w' can't be written fully.
 write :: forall chip w . (Chip chip, Storable w) => BusDevice chip -> w -> IO ()
 write busdev@(BusDevice _id addr ptr) = \w -> do
-    let sizeW = sizeOf w 
-    when (maxTransferSize < (fI sizeW)) $ throwIO $ errI2C eNOMEM $ tagErr busdev
+    let size = sizeOf w 
+        withMem = if size <= maxAllocaBytes then allocaBytes else mallocBytes'
 
-    res <- try @IOException $ allocaBytes @Word8 sizeW $ \mem -> do
+    res <- try @IOException $ withMem size $ \mem -> do
         poke (castPtr mem) w
-        _ <- assertOK (tagErr busdev) $ c_i2c_write ptr (fromChipAddress addr) mem (fI sizeW)
+        _ <- assertOK (tagErr busdev) $ c_i2c_write ptr (fromChipAddress addr) mem (fI size)
         pure ()
     case res of
         Right a   -> pure a
         Left err  -> throwIO $ fromIOException err
     where
       tagErr busdev = "Internal.write " <> show busdev
+      mallocBytes' size f = bracket (mallocBytes size) free f
     
     
 
@@ -176,12 +177,11 @@ writeSome busdev = \bs ->
     throwIO $ errI2C eNOSYS "writeSome not implemented on Linux"
 
 
--- | maximal number of bytes allowed in a transaction. note that for 'read' and 
---   'readSome' the size of the write part is included.
---   FIXME: find a suitable large value that does not overflow the stack when we
---          make the call to 'allocaBytes'
-maxTransferSize :: Word
-maxTransferSize = 128
+-- | the maximal number of bytes allowed in a transaction for stack allocation.
+--   otherwise the memory is allocated on the heap. 
+--   note that for 'read' and 'readSome' the size of the write part is included.
+maxAllocaBytes :: Int
+maxAllocaBytes = 128
 
 
 fI :: (Integral a, Num b) => a -> b
