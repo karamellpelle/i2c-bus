@@ -64,13 +64,13 @@ instance Chip chip => Show (BusDevice chip) where
     show (BusDevice id addr _ptr) = "(BusDevice " <> (toString $ chipName @chip) <> " " <> show addr <> "@" <> toString id <> ")"
 
 
--- | opens a connection to chip based on bus identifier and hardware address
+-- | opens a connection to chip based on bus identifier and hardware address.
 openChip :: forall chip . (Chip chip) => Text -> ChipAddress -> IO (BusDevice chip)
 openChip busid addr = do
     (try @IOException $ openFd (fromIdentifier busid) ReadWrite defaultFileFlags) >>= \case
         Left err   -> throwIO $ fromIOException err
         Right fd   -> do
-            _ <- assertOK (tagErr busid addr) $ c_ioctl (fI fd) cpp_I2C_SLAVE_FORCE (fromChipAddress addr)
+            assertOK' (tagErr busid addr) $ c_ioctl (fI fd) cpp_I2C_SLAVE_FORCE (fromChipAddress addr)
             pure $ BusDevice busid addr $ fdToPtrI2C_Client fd
     where
       fromIdentifier = toString
@@ -91,7 +91,7 @@ closeChip (BusDevice _id _addr ptr) = do
 -- | set timeout for transfers
 chipTimeoutMs :: forall chip . (Chip chip) => BusDevice chip -> Word -> IO ()
 chipTimeoutMs busdev@(BusDevice _id _addr ptr) ms = do
-    _ <- assertOK tagErr $ c_ioctl (ptrI2C_ClientToFd ptr) cpp_I2C_TIMEOUT $ fromIntegral $ div ms 10
+    assertOK' tagErr $ c_ioctl (ptrI2C_ClientToFd ptr) cpp_I2C_TIMEOUT $ fromIntegral $ div ms 10
     pure ()
     where
       tagErr = "chipTimeoutMs: could not set timeout to " <> show ms <> " ms on " <> show busdev
@@ -121,7 +121,7 @@ read busdev@(BusDevice _id addr ptr) = \w -> do
     res <- try @IOException $ withMem size $ \mem -> do
         -- set write data. this data will be overwritten after reading
         poke (castPtr mem) w
-        _ <- assertOK (tagErr busdev) $ c_i2c_read ptr (fromChipAddress addr) mem (fI sizeW) mem (fI sizeR)
+        assertOK' (tagErr busdev) $ c_i2c_read ptr (fromChipAddress addr) mem (fI sizeW) mem (fI sizeR)
         peek $ castPtr mem
 
     case res of
@@ -156,7 +156,7 @@ write busdev@(BusDevice _id addr ptr) = \w -> do
 
     res <- try @IOException $ withMem size $ \mem -> do
         poke (castPtr mem) w
-        _ <- assertOK (tagErr busdev) $ c_i2c_write ptr (fromChipAddress addr) mem (fI size)
+        assertOK' (tagErr busdev) $ c_i2c_write ptr (fromChipAddress addr) mem (fI size)
         pure ()
     case res of
         Right a   -> pure a
@@ -195,6 +195,10 @@ assertOK str ma = do
     if res < 0 then throwIO $ errI2C (Errno $ negate res) str
                else pure $ fromIntegral res
                   
+assertOK' :: Text -> IO CInt -> IO ()
+assertOK' str ma = do
+    _ <- assertOK @CInt str ma
+    pure ()
 
 --------------------------------------------------------------------------------
 --  FFI
