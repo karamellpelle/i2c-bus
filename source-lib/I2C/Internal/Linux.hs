@@ -129,7 +129,7 @@ read busdev@(BusDevice _id addr ptr) = \w -> do
         Left err  -> throwIO $ fromIOException err
 
     where
-      tagErr busdev = "Internal.read " <> show busdev
+      tagErr busdev = "read " <> show busdev
       mallocBytes' size f = bracket (mallocBytes size) free f
     
 -- |  read an arbitrary amount of bytes until NACK by slave. the reading
@@ -162,7 +162,7 @@ write busdev@(BusDevice _id addr ptr) = \w -> do
         Right a   -> pure a
         Left err  -> throwIO $ fromIOException err
     where
-      tagErr busdev = "Internal.write " <> show busdev
+      tagErr busdev = "write " <> show busdev
       mallocBytes' size f = bracket (mallocBytes size) free f
     
     

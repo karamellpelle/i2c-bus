@@ -131,4 +131,19 @@ tests:
             #- tasty
             #- tasty-hedgehog
             #- tasty-hunit
+    ssd1306:
+        source-dirs: tests/ssd1306/
+        main:        Main.hs
+        ghc-options:
+            - -threaded
+            - -rtsopts
+            - -with-rtsopts "-N -T"
+        dependencies:
+            - i2c-bus
+            - pretty-simple
+            - JuicyPixels
+            #- hedgehog
+            #- tasty
+            #- tasty-hedgehog
+            #- tasty-hunit
 

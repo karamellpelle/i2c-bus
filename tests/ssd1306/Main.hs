@@ -24,13 +24,28 @@ module Main
 ) where
 
 import Relude
-import I2C
-
 import Foreign
+import I2C
+import Codec.Picture
+import Codec.Picture.Gif
+import Data.ByteString qualified as BS
+import Control.Concurrent (threadDelay)
+
 
 
 --------------------------------------------------------------------------------
 --  hardware
+
+--data SSD1306  = SSD1306 {
+--                ssd1306_BusDevice :: BusDevice SSD1306
+--              , ssd1306_Width :: Word
+--              , ssd1306_Height :: Word
+--              , ssd1306_VccExternal :: Bool
+--              }
+--          
+--ssd1306_SizeRAM :: SSD1306 -> Word
+--ssd1306_SizeRAM ssd = div (ssd1306_Width ssd * ssd1306_Height ssd) 8
+-- $(instanceChip ''SSD1306)
 
 address :: ChipAddress
 address = 0x3C
@@ -40,6 +55,9 @@ width = 128
 
 height :: Word
 height = 32
+
+sizeRAM :: Word
+sizeRAM = width * (div (height + 7) 8)
 
 vccExternal :: Bool
 vccExternal = False -- False => Switch Cap VCC
@@ -55,8 +73,6 @@ data Command  = NOP
               | SetDisplayOffset Word8
               | SetStartLine Word8 -- 0 <= n <= 63
               | ChargePump Word8
-              | LowerColumnStart Word8    -- FIXME: why, this is only for page MemoryMode
-              | HigherColumnStart Word8   -- FIXME: why, this is only for page MemoryMode
               | MemoryMode Word8
               | SegRemapOff
               | SegRemapOn
@@ -88,9 +104,8 @@ instance Storable Command where
         SetDisplayOffset off      -> poke' 0xD3 off nop
         SetStartLine line         -> poke' (0x40 .|. (0b00111111 .&. line)) nop nop
         ChargePump p              -> poke' 0x8D p nop
-        LowerColumnStart x        -> poke' (0x00 .|. (0b00001111 .&. x)) nop nop -- FIXME: how does this work when also command uses 0x00?
-        HigherColumnStart x       -> poke' (0x10 .|. (0b00001111 .&. x)) nop nop
-        MemoryMode mode           -> poke' (0x20 .|. (0b00001111 .&. mode)) nop nop
+        --MemoryMode mode           -> poke' (0x20 .|. (0b00000011 .&. mode)) nop nop
+        MemoryMode mode           -> poke' (0x20 .|. (0b00000011 .&. mode)) 0 0 -- using 'nop' (0xE3) gave a bug that was difficult to find!
         SegRemapOff               -> poke' 0xA0 nop nop
         SegRemapOn                -> poke' 0xA1 nop nop
         ComRemapOff               -> poke' 0xC0 nop nop
@@ -115,37 +130,26 @@ instance Storable Command where
 --------------------------------------------------------------------------------
 --  ImageOLED
 
-data ImageOLED = ImageOLED
+data ImageOLED = ImageOLED (Image PixelRGB8)
 
 instance Storable ImageOLED where
-    sizeOf _ = fromIntegral $ width * (div (height + 7) 8) -- "+ 7" rounds upwards, ceiling 
+    sizeOf _ = fromIntegral $ width * (div (height + 7) 8) -- "+ 7" for upward rounding, ceiling instead of truncate
     alignment _ = 1
-    peek ptr = pure ImageOLED
-    poke ptr img = do
-        let bytes = sizeOf ImageOLED
-        forM_ [0..bytes - 1] $ \ix -> do
-            pokeByteOff @Word8 ptr ix $ fromIntegral ix
-        --uint16_t count = WIDTH * ((HEIGHT + 7) / 8);
-        --uint8_t *ptr = buffer;
-        --if (wire) { // I2C
-        --  wire->beginTransmission(i2caddr);
-        --  WIRE_WRITE((uint8_t)0x40);
-        --  uint16_t bytesOut = 1;
-        --  while (count--) {
-        --    if (bytesOut >= WIRE_MAX) {
-        --      wire->endTransmission();
-        --      wire->beginTransmission(i2caddr);
-        --      WIRE_WRITE((uint8_t)0x40);
-        --      bytesOut = 1;
-        --    }
-        --    WIRE_WRITE(*ptr++);
-        --    bytesOut++;
-        --  }
-        --  wire->endTransmission();
-        --
-        pure ()
+    peek ptr = undefined
+    poke ptr a@(ImageOLED img) = forM_ (range 0 $ fromIntegral $ sizeOf a) $ \ix -> do
+        let i = mod ix $ fromIntegral width
+            j = (div ix $ fromIntegral width) * 8
+        pokeByteOff @Word8 ptr ix $ fromCell i j 0b1
+        where
+          fromCell i j 0 = 0x00
+          fromCell i j x = (if pick i j then x else 0) .|. fromCell i (j + 1) (shiftL x 1)
+          pick i j = 
+              let PixelRGB8 r g b = pixelAt img i j
+              in  b /= 0
 
 
+range :: (Eq a, Num a) => a -> a -> [a]
+range b e = if b == e then [] else b : range (b + 1) e
 
 --------------------------------------------------------------------------------
 --  SSD1306
@@ -154,14 +158,10 @@ $(chip "SSD1306")
 
 $(register ''SSD1306 0x00 "COMMAND" ''Command)
 $(register ''SSD1306 0x40 "IMAGE" ''ImageOLED)
--- $(register ''SSD1306 0x40 "IMAGE_RAW" ''[Word8])
-
 
 
 ssd1306Init :: BusDevice SSD1306 -> IO ()
 ssd1306Init ssd1306 = do
-      -- create buffer
-      -- clear bitmap
 
     regwrite ssd1306 regCOMMAND $ DisplayOff
 
@@ -182,7 +182,6 @@ ssd1306Init ssd1306 = do
     regwrite ssd1306 regCOMMAND $ MemoryMode 0b00 
 
     regwrite ssd1306 regCOMMAND $ SegRemapOn
-
     regwrite ssd1306 regCOMMAND $ ComRemapOn
 
     --if ((WIDTH == 128) && (HEIGHT == 32)) {
@@ -207,21 +206,26 @@ ssd1306Init ssd1306 = do
 ssd1306Image :: BusDevice SSD1306 -> ImageOLED -> IO ()
 ssd1306Image ssd1306 img = do
     
-    regwrite ssd1306 regCOMMAND $ ColumnAddr 0x00 (0x00 + (fromIntegral $ width - 1))
-
     -- end address 0xFF is OK since we use horizontal memory mode (we write columns before pages)
     regwrite ssd1306 regCOMMAND $ PageAddr 0x00 0xFF
+
+    regwrite ssd1306 regCOMMAND $ ColumnAddr 0x00 (0x00 + (fromIntegral $ width - 1))
 
     -- write image to GDDRAM
     regwrite ssd1306 regIMAGE img
 
 
-loadImageOLED :: FilePath -> IO ImageOLED
-loadImageOLED = undefined
-
-
-ssd1306Clear :: BusDevice SSD1306 -> IO ()
-ssd1306Clear = undefined
+loadGIF :: FilePath -> IO [(ImageOLED, GifDelay)]
+loadGIF path = do
+    bs <- BS.readFile path
+    
+    let Right imgs   = decodeGifImages bs
+    let Right delays = getDelaysGifImages bs
+    pure $ zip (fmap wrap imgs) delays
+    where
+      wrap = 
+          ImageOLED . convertRGB8 
+            
 
 
 --------------------------------------------------------------------------------
@@ -230,10 +234,16 @@ ssd1306Clear = undefined
 main :: IO ()
 main = do
     ssd1306 <- openChip "/dev/i2c-1" address
-    --img <- loadImageOLED "tests/ssd1306/image-128x32.png"
+    ssd1306Init ssd1306
 
-    ssd1306Init  ssd1306
-    --ssd1306Clear ssd1306
-    ssd1306Image ssd1306 $ ImageOLED
+    imgs <- loadGIF "tests/ssd1306/image-128x32.gif"
+    display ssd1306 imgs
+    
+    where
+      display ssd1306 [] =
+          pure () -- TODO: look at looping info
+      display ssd1306 ((img, delay):imgs) = do
+          ssd1306Image ssd1306 img
+          threadDelay $ fromIntegral $ delay * 10000
     
 
