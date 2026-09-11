@@ -21,6 +21,7 @@
 module I2C.TH
 (
     chip,
+    instanceChip,
 
     register,
 
@@ -93,19 +94,19 @@ chip :: String -> Q [Dec]
 chip name = do
     let name' = mkName name
     dData <- decData name' 
-    dInstance <- decInstance name' 
-    pure [dData, dInstance]
+    dInstance <- instanceChip name' 
+    pure $ dData <> dInstance
     
     where
-      decData :: Name -> Q Dec
+      decData :: Name -> Q [Dec]
       decData tname = 
-          dataD (cxt []) tname [] Nothing [] $ one $ derivClause Nothing $ [conT $ ''Show] 
+          fmap one $ dataD (cxt []) tname [] Nothing [] $ one $ derivClause Nothing $ [conT $ ''Show] 
 
-      decInstance :: Name -> Q Dec
-      decInstance tname = do
-          let dName :: Q Dec
-              dName = funD 'chipName $ one $ clause [] (normalB $ litE $ stringL $ nameBase tname ) []
-          instanceD (cxt []) (appT (conT ''Chip) (conT tname)) [dName]
+instanceChip :: Name -> Q [Dec]
+instanceChip ty = do
+    let dName :: Q Dec
+        dName = funD 'chipName $ one $ clause [] (normalB $ litE $ stringL $ nameBase ty ) []
+    fmap one $ instanceD (cxt []) (appT (conT ''Chip) (conT ty)) [dName]
 
 
 --------------------------------------------------------------------------------
