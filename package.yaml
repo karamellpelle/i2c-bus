@@ -5,7 +5,7 @@ spec-version: 0.36.0
 name:
     i2c-bus
 version:
-    0.3
+    0.4
 github:
     karamellpelle/i2c-bus
 homepage:
@@ -101,9 +101,6 @@ library:
           # https://stackoverflow.com/questions/18858190/whats-in-include-uapi-of-kernel-source-project
           - /usr/include
           - cbits
-        other-extensions:
-          - ForeignFunctionInterface
-
 when:
   - condition: os( linux )
     cpp-options: -UINTERNAL_USE_EMPTY -DINTERNAL_USE_LINUX
@@ -127,7 +124,6 @@ tests:
             - -Wno-unused-packages
         dependencies:
             - i2c-bus
-            - pretty-simple
             #- hedgehog
             #- tasty
             #- tasty-hedgehog
@@ -138,11 +134,9 @@ tests:
         source-dirs: tests/ssd1306/
         main:        Main.hs
         ghc-options:
-            - -threaded
             - -rtsopts
-            - -with-rtsopts "-N -T"
+            - -with-rtsopts "-N"
         dependencies:
             - i2c-bus
-            - pretty-simple
             - JuicyPixels
 

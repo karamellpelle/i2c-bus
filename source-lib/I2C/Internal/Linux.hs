@@ -18,7 +18,6 @@
 -- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 -- SOFTWARE.
 {-# LANGUAGE ForeignFunctionInterface #-}
-{-# OPTIONS_GHC -Wno-redundant-constraints #-}
 module I2C.Internal.Linux
 (
     BusDevice (..),
