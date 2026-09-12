@@ -114,10 +114,9 @@ $(field ''PWR_MGMT_1 "SLEEP"          "0*000000")
 
 $(register  ''MPU6050 0x41 "TEMP_OUT" ''TemperatureC)
 
-
 testMPU6050 :: IO ()
 testMPU6050 = do
-    busdev <- openChip @MPU6050 "/dev/i2c-1" 0x68
+    busdev <- openChip "/dev/i2c-1" 0x68
 
     regwrite busdev regUSER_CTRL  $ def & bitsetFIFO_RESET & bitsetI2C_MST_RESET & bitsetSIG_COND_RESET
     regwrite busdev regPWR_MGMT_1 $ def & setCLKSEL 2 & bitclearSLEEP

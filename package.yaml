@@ -108,7 +108,8 @@ when:
   - condition: os( linux )
     cpp-options: -UINTERNAL_USE_EMPTY -DINTERNAL_USE_LINUX
     # see values of 'arch' here: https://hackage-content.haskell.org/package/base-4.22.0.0/docs/System-Info.html#v:arch
-    # TODO: add architectures to big or little endian
+
+  # TODO: add architectures to big or little endian
   - condition: arch( aarch64 ) || arch( i386 ) || arch( x86_64 )
     cpp-options: -UARCH_IS_UNKNOWN -DARCH_IS_LITTLE_ENDIAN
   #- condition: # 
@@ -131,7 +132,9 @@ tests:
             #- tasty
             #- tasty-hedgehog
             #- tasty-hunit
+
     ssd1306:
+        # to load this project in ghci: `stack ghci --test i2c-bus:test:ssd1306`
         source-dirs: tests/ssd1306/
         main:        Main.hs
         ghc-options:
@@ -142,8 +145,4 @@ tests:
             - i2c-bus
             - pretty-simple
             - JuicyPixels
-            #- hedgehog
-            #- tasty
-            #- tasty-hedgehog
-            #- tasty-hunit
 
