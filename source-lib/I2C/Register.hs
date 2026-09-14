@@ -49,11 +49,11 @@ data Register chip t = Register Text RegisterAddress
 
 regread :: (Chip chip, Storable a, MonadIO m) => Internal.BusDevice chip -> Register chip a -> m a
 regread busdev (Register _name addr) = 
-    liftIO $ Internal.read busdev addr
+    regread' busdev addr
 
 regwrite :: (Chip chip, Storable a, MonadIO m) => Internal.BusDevice chip -> Register chip a -> a -> m ()
-regwrite busdev (Register _name addr) = \a ->
-    liftIO $ Internal.write busdev $ StorableAB addr a
+regwrite busdev (Register _name addr) = 
+    regwrite' busdev addr
 
 regmodify :: (Chip chip, Storable a, MonadIO m) => Internal.BusDevice chip -> Register chip a -> (a -> a) -> m a
 regmodify = \busdev reg f -> do
@@ -68,11 +68,12 @@ regmodify = \busdev reg f -> do
 
 regread' :: forall a chip m . (Chip chip, Storable a, MonadIO m) => Internal.BusDevice chip -> RegisterAddress -> m a
 regread' busdev addr = 
-    liftIO $ Internal.read busdev addr
+    liftIO $ Internal.read busdev (sizeOf addr) (flip poke addr) (sizeOf @a undefined) peek
 
 regwrite' :: forall a chip m . (Chip chip, Storable a, MonadIO m) => Internal.BusDevice chip -> RegisterAddress -> a -> m ()
-regwrite' busdev addr = \a ->
-    liftIO $ Internal.write busdev $ StorableAB addr a
+regwrite' busdev addr = \a -> do
+    let w = StorableAB addr a
+    liftIO $ Internal.write busdev (sizeOf w) (flip poke w) 
 
 regmodify' :: forall a chip m . (Chip chip, Storable a, MonadIO m) => Internal.BusDevice chip -> RegisterAddress -> (a -> a) -> m a
 regmodify' = \busdev addr f -> do
@@ -80,4 +81,3 @@ regmodify' = \busdev addr f -> do
     let a' = f a
     regwrite' busdev addr a'
     pure a'
-

@@ -23,7 +23,6 @@ module Main
 ) where
 
 import Relude
-import Text.Pretty.Simple
 import I2C
 
 

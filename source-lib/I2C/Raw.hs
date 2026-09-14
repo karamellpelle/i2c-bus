@@ -37,7 +37,7 @@ import I2C.Chip
 
 rawread :: forall a chip m . (Chip chip, Storable a, MonadIO m) => Internal.BusDevice chip -> m a
 rawread busdev = liftIO $ 
-    Internal.read busdev ()
+    Internal.read busdev 0 (const $ pure ()) (sizeOf @a undefined) peek
 
 --rawreadSome :: forall chip m . (Chip chip, MonadIO m) => Internal.BusDevice chip -> m ByteString
 --rawreadSome busdev = liftIO $
@@ -45,7 +45,7 @@ rawread busdev = liftIO $
 
 rawwrite :: forall a chip m . (Chip chip, Storable a, MonadIO m)  => Internal.BusDevice chip -> a -> m ()
 rawwrite busdev = \w -> liftIO $
-    Internal.write busdev w
+    Internal.write busdev (sizeOf w) (flip poke w)
 
 rawmodify :: forall a chip m . (Chip chip, Storable a, MonadIO m)  => Internal.BusDevice chip -> (a -> a) -> m a
 rawmodify busdev = \f -> liftIO $ do

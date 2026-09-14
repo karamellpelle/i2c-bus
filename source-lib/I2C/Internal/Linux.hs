@@ -109,19 +109,17 @@ chipTimeoutMs busdev@(BusDevice _id _addr ptr) ms = do
 --      * call shall fail if 'w' can't be written fully.
 --      * call shall fail if 'r' can't be read fully
 --
-read :: forall chip w r . (Chip chip, Storable w, Storable r)  => 
-        BusDevice chip -> w -> IO r
-read busdev@(BusDevice _id addr ptr) = \w -> do
-    let sizeW = sizeOf w 
-        sizeR = sizeOf (undefined :: r)
-        size = max sizeW sizeR
+read :: forall chip w r . (Chip chip)  => 
+        BusDevice chip -> Int -> (Ptr w -> IO ()) -> Int -> (Ptr r -> IO r) -> IO r
+read busdev@(BusDevice _id addr ptr) sizeW pokeW sizeR peekR = do
+    let size = max sizeW sizeR
         withMem = if size <= maxAllocaBytes then allocaBytes else mallocBytes'
 
     res <- try @IOException $ withMem size $ \mem -> do
         -- set write data. this data will be overwritten after reading
-        poke (castPtr mem) w
+        pokeW $ castPtr mem
         assertOK' (tagErr busdev) $ c_i2c_read ptr (fromChipAddress addr) mem (fI sizeW) mem (fI sizeR)
-        peek $ castPtr mem
+        peekR $ castPtr mem
 
     case res of
         Right a   -> pure a
@@ -141,21 +139,21 @@ read busdev@(BusDevice _id addr ptr) = \w -> do
 --      * call can fail if the slave does not NACK after reading a larger number 
 --        of bytes determined by the backend (typically by filling up a buffer).
 --
-readSome :: forall chip w . (Chip chip, Storable w) => BusDevice chip -> w -> IO ByteString
-readSome busdev = \w ->
-    throwIO $ errI2C eNOSYS "readSome not implemented on Linux"
+--readSome :: forall chip w . (Chip chip, Storable w) => BusDevice chip -> w -> IO ByteString
+--readSome busdev = \w ->
+--    throwIO $ errI2C eNOSYS "readSome not implemented on Linux"
 
 
 -- |  write a specific amount of bytes determined by 'Storable w'.
 --      * call shall fail if 'w' can't be written fully.
-write :: forall chip w . (Chip chip, Storable w) => BusDevice chip -> w -> IO ()
-write busdev@(BusDevice _id addr ptr) = \w -> do
-    let size = sizeOf w 
-        withMem = if size <= maxAllocaBytes then allocaBytes else mallocBytes'
+write :: forall chip w . (Chip chip) => 
+         BusDevice chip -> Int -> (Ptr w -> IO ()) -> IO ()
+write busdev@(BusDevice _id addr ptr) sizeW pokeW = do
+    let withMem = if sizeW <= maxAllocaBytes then allocaBytes else mallocBytes'
 
-    res <- try @IOException $ withMem size $ \mem -> do
-        poke (castPtr mem) w
-        assertOK' (tagErr busdev) $ c_i2c_write ptr (fromChipAddress addr) mem (fI size)
+    res <- try @IOException $ withMem sizeW $ \mem -> do
+        pokeW $ castPtr mem
+        assertOK' (tagErr busdev) $ c_i2c_write ptr (fromChipAddress addr) mem (fI sizeW)
         pure ()
     case res of
         Right a   -> pure a
@@ -171,9 +169,9 @@ write busdev@(BusDevice _id addr ptr) = \w -> do
 --      * call shall fail if 'w' can't be written fully.
 --      * call can fail if the slave does not NACK after reading a larger number 
 --        of bytes determined by the backend (typically by filling up a buffer).
-writeSome :: forall chip . (Chip chip) => BusDevice chip -> ByteString -> IO Word
-writeSome busdev = \bs ->
-    throwIO $ errI2C eNOSYS "writeSome not implemented on Linux"
+--writeSome :: forall chip . (Chip chip) => BusDevice chip -> ByteString -> IO Word
+--writeSome busdev = \bs ->
+--    throwIO $ errI2C eNOSYS "writeSome not implemented on Linux"
 
 
 -- | the maximal number of bytes allowed in a transaction for stack allocation.
