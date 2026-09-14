@@ -33,7 +33,7 @@ import Data.Storable.Endian
 -- then load this file:
 --    ghci> :l tests/GHCI.hs
 --  
--- if you get link errors, run `stack test` which will build the FFI parts,
+-- if you get link errors, run `stack build` which will build the FFI parts,
 -- and those symbols will then be available in GHCi
 --  
 --------------------------------------------------------------------------------

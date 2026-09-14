@@ -1,3 +1,4 @@
 # TODO
-* add optimization flags like `-O2`? how does this work for a library?
-* check valid name for register (non-empty, starting Uppercase letter)
+* add I2C.EEPROM module?
+* TH: setting to define generated show instance (binary or hex) 
+* TH: assert valid register name is non-empty and starts with Uppercase letter)

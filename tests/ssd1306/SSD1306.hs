@@ -199,7 +199,7 @@ ssd1306Init ssd = do
     regwrite busdev regCOMMAND $ DriveClockDiv 0x80
 
     regwrite busdev regCOMMAND $ MapMultiplex $ fromIntegral $ height - 1
-    -- ^ does this overwrite previous image data? if so, set to max (63)
+    -- ^ does this overwrite previous image data? if so, try to set to max (63)
 
     regwrite busdev regCOMMAND $ MapOffset 0
 
@@ -252,7 +252,6 @@ ssd1306Image ssd img = do
     -- end address 0xFF is OK since we use horizontal memory mode (we write columns before pages)
     regwrite busdev regCOMMAND $ RAMPages 0x00 0xFF
 
-    --regwrite busdev regCOMMAND $ RAMColumns 0x00 (0x00 + (fromIntegral $ width - 1))
     regwrite busdev regCOMMAND $ RAMColumns 0x00 (0x00 + (fromIntegral $ width - 1))
 
     -- TODO: use scroll functionality to setup automatic scroll if image is too large for the screen hardware
