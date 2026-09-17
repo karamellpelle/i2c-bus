@@ -69,7 +69,7 @@ openChip busid addr = do
     (try @IOException $ openFd (fromIdentifier busid) ReadWrite defaultFileFlags) >>= \case
         Left err   -> throwIO $ fromIOException err
         Right fd   -> do
-            assertOK' (tagErr busid addr) $ c_ioctl (fI fd) cpp_I2C_SLAVE_FORCE (fromChipAddress addr)
+            assertOK' (tagErr busid addr) $ c_ioctl (fI fd) c_I2C_SLAVE_FORCE (fromChipAddress addr)
             pure $ BusDevice busid addr $ fdToPtrI2C_Client fd
     where
       fromIdentifier = toString
@@ -90,7 +90,7 @@ closeChip (BusDevice _id _addr ptr) = do
 -- | set timeout for transfers
 chipTimeoutMs :: forall chip . (Chip chip) => BusDevice chip -> Word -> IO ()
 chipTimeoutMs busdev@(BusDevice _id _addr ptr) ms = do
-    assertOK' tagErr $ c_ioctl (ptrI2C_ClientToFd ptr) cpp_I2C_TIMEOUT $ fromIntegral $ div ms 10
+    assertOK' tagErr $ c_ioctl (ptrI2C_ClientToFd ptr) c_I2C_TIMEOUT $ fromIntegral $ div ms 10
     pure ()
     where
       tagErr = "chipTimeoutMs: could not set timeout to " <> show ms <> " ms on " <> show busdev
@@ -129,7 +129,8 @@ read busdev@(BusDevice _id addr ptr) sizeW pokeW sizeR peekR = do
       tagErr busdev = "read " <> show busdev
       mallocBytes' size f = bracket (mallocBytes size) free f
     
--- |  read an arbitrary amount of bytes until NACK by slave. the reading
+
+-- |  read an arbitrary amount of bytes until NACK by slave. the read
 --    can be prefixed by a write of a specific amount of bytes determined by
 --    'Storable w' if and only if 'sizeOf w' is non-zero. it is very
 --    encouraged that the backend implement this as a "repeated START" 
@@ -139,9 +140,10 @@ read busdev@(BusDevice _id addr ptr) sizeW pokeW sizeR peekR = do
 --      * call can fail if the slave does not NACK after reading a larger number 
 --        of bytes determined by the backend (typically by filling up a buffer).
 --
---readSome :: forall chip w . (Chip chip, Storable w) => BusDevice chip -> w -> IO ByteString
---readSome busdev = \w ->
---    throwIO $ errI2C eNOSYS "readSome not implemented on Linux"
+readSome :: forall chip w r . (Chip chip) => 
+            BusDevice chip -> Int -> (Ptr w -> IO ()) -> Int -> (Int -> Ptr r -> IO r)-> IO r
+readSome busdev sizeW pokeW sizeR peekR' = 
+    throwIO $ errI2C eNOSYS "readSome not implemented on Linux"
 
 
 -- |  write a specific amount of bytes determined by 'Storable w'.
@@ -166,12 +168,11 @@ write busdev@(BusDevice _id addr ptr) sizeW pokeW = do
 
 -- |  write an arbitrary amount of bytes until NACK by slave. returns the number
 --    of bytes written.
---      * call shall fail if 'w' can't be written fully.
---      * call can fail if the slave does not NACK after reading a larger number 
---        of bytes determined by the backend (typically by filling up a buffer).
---writeSome :: forall chip . (Chip chip) => BusDevice chip -> ByteString -> IO Word
---writeSome busdev = \bs ->
---    throwIO $ errI2C eNOSYS "writeSome not implemented on Linux"
+--      * FIXME: can call fail if the slave does not NACK after reading a larger number 
+--        of bytes determined by the backend (typically by filling up a buffer)?
+writeSome :: forall chip w . (Chip chip) => BusDevice chip -> Int -> (Ptr w -> IO ()) -> IO Int
+writeSome busdev sizeW pokeW =
+    throwIO $ errI2C eNOSYS "writeSome not implemented on Linux"
 
 
 -- | the maximal number of bytes allowed in a transaction for stack allocation.
@@ -215,13 +216,13 @@ data I2C_Client
 
 -- |  > /* Use this slave address, even if it is already in use by a driver! */
 --    > #define I2C_SLAVE_FORCE	0x0706	
-cpp_I2C_SLAVE_FORCE :: CULong
-cpp_I2C_SLAVE_FORCE = 0x0706
+c_I2C_SLAVE_FORCE :: CULong
+c_I2C_SLAVE_FORCE = 0x0706
 
 -- |  > /* set timeout in units of 10 ms */
 --    > #define I2C_TIMEOUT 0x0702	
-cpp_I2C_TIMEOUT :: CULong
-cpp_I2C_TIMEOUT = 0x0702
+c_I2C_TIMEOUT :: CULong
+c_I2C_TIMEOUT = 0x0702
 
 -- | int ioctl(int d, int request, ...)
 foreign import ccall safe "sys/ioctl.h ioctl" c_ioctl
