@@ -17,6 +17,14 @@
 -- LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 -- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 -- SOFTWARE.
+-- | 
+-- Module                  : I2C.Chip
+-- Description             : Chip type
+-- SPDX-License-Identifier : MIT
+-- Copyright               : (c) karamellpelle@hotmail.com, 2026
+-- Maintainer              : karamellpelle@hotmail.com
+-- Stability               : experimental
+--
 {-# LANGUAGE AllowAmbiguousTypes #-}
 module I2C.Chip
 (
@@ -33,9 +41,10 @@ import I2C.Types
 --------------------------------------------------------------------------------
 --  chip
 
--- | typeclass for I2C chips
+-- | Typeclass for I2C chips
 class Chip chip where
-    -- | human readable identifier
+    {-# MINIMAL chipName #-}
+    -- | Human readable name
     chipName :: Text
     chipName = "(unknown chip)"
 

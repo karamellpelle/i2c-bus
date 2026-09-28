@@ -18,13 +18,28 @@
 -- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 -- SOFTWARE.
 {-# LANGUAGE TemplateHaskell #-}
+-- | 
+-- Module                  : I2C.TH
+-- Description             : Chips and registers utilities 
+-- SPDX-License-Identifier : MIT
+-- Copyright               : (c) karamellpelle@hotmail.com, 2026
+-- Maintainer              : karamellpelle@hotmail.com
+-- Stability               : experimental
+--
+-- Create chips and registers through Template Haskell
+--------------------------------------------------------------------------------
 module I2C.TH
 (
+    -- * Imperative TH settings
+    setDefaults,
+    setPrefixRegister,
+
+    -- * Create Chips
     chip,
     instanceChip,
 
+    -- * Create Registers
     register,
-
     register8,
     register16LE,
     register16BE,
@@ -33,10 +48,9 @@ module I2C.TH
     register64LE,
     register64BE,
 
+    -- * Create fields
     field,
 
-    setDefaults,
-    setPrefixRegister,
 ) where
 
 import Relude hiding (Type)
@@ -73,7 +87,7 @@ instance Default QSetting where
           qsettingPrefixRegister = "reg"
         }
 
--- | restore "factory settings"
+-- | Restore "factory settings"
 setDefaults :: String -> Q [Dec]
 setDefaults pre = do
     putQ @QSetting def 
@@ -82,13 +96,13 @@ setDefaults pre = do
 --------------------------------------------------------------------------------
 --  Chip
 
--- | declare a Chip with name 'name' 
+-- | Declare a 'Chip' from name
 --
---    chip "MYCHIP"
---  ======>
---    data MYCHIP deriving Show
---    instance Chip MYCHIP where
---      chipName = "MYCHIP"
+-- > $(chip "MYCHIP")
+-- > ======>
+-- >   data MYCHIP deriving Show
+-- >   instance Chip MYCHIP where
+-- >     chipName = "MYCHIP"
 --
 chip :: String -> Q [Dec]
 chip name = do
@@ -113,13 +127,13 @@ instanceChip ty = do
 --  Register
 
 
--- | declare a register of Chip from Storable type. 
+-- | Declare a 'Register' of 'Chip' from 'Storable'.
 --   Storable is relative to the chip's hardware
 --
---  $(register ''MPU6050 0x41 "TEMP_OUT" ''TemperatureC)
---  ======>
---    regTEMP_OUT :: Register MPU6050 TemperatureC
---    regTEMP_OUT = Register "TEMP_OUT" 65
+-- > $(register ''MPU6050 0x41 "TEMP_OUT" ''TemperatureC)
+-- > ======>
+-- >   regTEMP_OUT :: Register MPU6050 TemperatureC
+-- >   regTEMP_OUT = Register "TEMP_OUT" 65
 --
 register :: Name -> RegisterAddress -> String -> Name -> Q [Dec]
 register tychip addr name ty = do
@@ -129,51 +143,51 @@ register tychip addr name ty = do
           ]
 
 
--- | declare a register of Chip that contains Word8 data
+-- | Declare a register of Chip that contains Word8 data
 --
---  $(register8 ''MYCHIP 0x22 "MY8" 0x83)
---  ======>
---    newtype MY8
---      = MY8 Store8
---      deriving Storable
---      deriving Eq
---    instance Default MY8 where
---      def = MY8 131
---    instance Show MY8 where
---      Text.Show.show = I2C.TH.showRegT8Bin "MY8"
---    regMY8 :: Register MYCHIP MY8
---    regMY8 = Register "MY8" 34
+-- > $(register8 ''MYCHIP 0x22 "MY8" 0x83)
+-- > ======>
+-- >   newtype MY8
+-- >     = MY8 Store8
+-- >     deriving Storable
+-- >     deriving Eq
+-- >   instance Default MY8 where
+-- >     def = MY8 131
+-- >   instance Show MY8 where
+-- >     Text.Show.show = I2C.TH.showRegT8Bin "MY8"
+-- >   regMY8 :: Register MYCHIP MY8
+-- >   regMY8 = Register "MY8" 34
 register8 :: Name -> RegisterAddress -> String -> Word8 -> Q [Dec]
 register8 tychip addr name def =
     registerN tychip addr name def ''Store8 'showRegT8Bin
     
 
--- | declare a register of Chip that contains Word16 data as Little Endian
+-- | Declare a register of Chip that contains Word16 data as Little Endian
 register16LE :: Name -> RegisterAddress -> String -> Word16 -> Q [Dec]
 register16LE tychip addr name def =
     registerN tychip addr name def ''Store16LE 'showRegT16Hex
 
--- | declare a register of Chip that contains Word16 data as Big Endian
+-- | Declare a register of Chip that contains Word16 data as Big Endian
 register16BE :: Name -> RegisterAddress -> String -> Word16 -> Q [Dec]
 register16BE tychip addr name def =
     registerN tychip addr name def ''Store16BE 'showRegT16Hex
 
--- | declare a register of Chip that contains Word32 data as Little Endian
+-- | Declare a register of Chip that contains Word32 data as Little Endian
 register32LE :: Name -> RegisterAddress -> String -> Word32 -> Q [Dec]
 register32LE tychip addr name def =
     registerN tychip addr name def ''Store32LE 'showRegT32Hex
 
--- | declare a register of Chip that contains Word32 data as Big Endian
+-- | Declare a register of Chip that contains Word32 data as Big Endian
 register32BE :: Name -> RegisterAddress -> String -> Word32 -> Q [Dec]
 register32BE tychip addr name def =
     registerN tychip addr name def ''Store32BE 'showRegT32Hex
 
--- | declare a register of Chip that contains Word64 data as Little Endian
+-- | Declare a register of Chip that contains Word64 data as Little Endian
 register64LE :: Name -> RegisterAddress -> String -> Word64 -> Q [Dec]
 register64LE tychip addr name def =
     registerN tychip addr name def ''Store64LE 'showRegT64Hex
 
--- | declare a register of Chip that contains Word64 data as Big Endian
+-- | Declare a register of Chip that contains Word64 data as Big Endian
 register64BE :: Name -> RegisterAddress -> String -> Word64 -> Q [Dec]
 register64BE tychip addr name def =
     registerN tychip addr name def ''Store64BE 'showRegT64Hex
@@ -189,7 +203,8 @@ registerN tychip addr name def tywrap showf = do
     pure $ [dNewtype, dInstanceDefault, dInstanceShow] <> dRegister
 
 
--- | change prefix for declared Register values
+-- | Change prefix for declared Register values
+--
 setPrefixRegister :: String -> Q [Dec]
 setPrefixRegister pre = do
     assertValid pre
@@ -208,31 +223,31 @@ setPrefixRegister pre = do
 --------------------------------------------------------------------------------
 --  fields
 
--- | declare a field of a register; take a part of a register and make a type
+-- | Declare a field of a register; take a part of a register and make a type
 --
---   $(field ''MYREG8 "VALUES" "00***000")
---   ======>
---     getVALUES :: Integral n => MYREG8 -> n
---     getVALUES
---       = \w -> (fromIntegral $ (unsafeShiftR (un @Store8 w) 3 .&. 7))
---     setVALUES :: Integral n => n -> MYREG8 -> MYREG8
---     setVALUES
---       = \ n -> (under @Store8 $ (\ w -> ((w .&. complement 56) .|. unsafeShiftL (7 .&. fromIntegral n) 3)))
---
---   $(field ''MYREG16 "ENABLE" "000*000000000000")
---   ======>
---     getENABLE :: Integral n => MYREG16 -> n
---     getENABLE
---       = \w -> (fromIntegral $ (unsafeShiftR (un @Store16LE w) 12 .&. 1))
---     setENABLE :: Integral n => n -> MYREG16 -> MYREG16
---     setENABLE
---       = \ n -> (under @Store16LE $ (\ w -> ((w .&. complement 4096) .|. unsafeShiftL (1 .&. fromIntegral n) 12)))
---     bitsetENABLE :: MYREG16 -> MYREG16
---     bitsetENABLE = under @Store16LE (flip setBit 12)
---     bitclearENABLE :: MYREG16 -> MYREG16
---     bitclearENABLE = under @Store16LE (flip clearBit 12)
---     bittoggleENABLE :: MYREG16 -> MYREG16
---     bittoggleENABLE = under @Store16LE (flip complementBit 12)
+-- > $(field ''MYREG8 "VALUES" "00***000")
+-- > ======>
+-- >   getVALUES :: Integral n => MYREG8 -> n
+-- >   getVALUES
+-- >     = \w -> (fromIntegral $ (unsafeShiftR (un @Store8 w) 3 .&. 7))
+-- >   setVALUES :: Integral n => n -> MYREG8 -> MYREG8
+-- >   setVALUES
+-- >     = \ n -> (under @Store8 $ (\ w -> ((w .&. complement 56) .|. unsafeShiftL (7 .&. fromIntegral n) 3)))
+-- >
+-- > $(field ''MYREG16 "ENABLE" "000*000000000000")
+-- > ======>
+-- >   getENABLE :: Integral n => MYREG16 -> n
+-- >   getENABLE
+-- >     = \w -> (fromIntegral $ (unsafeShiftR (un @Store16LE w) 12 .&. 1))
+-- >   setENABLE :: Integral n => n -> MYREG16 -> MYREG16
+-- >   setENABLE
+-- >     = \ n -> (under @Store16LE $ (\ w -> ((w .&. complement 4096) .|. unsafeShiftL (1 .&. fromIntegral n) 12)))
+-- >   bitsetENABLE :: MYREG16 -> MYREG16
+-- >   bitsetENABLE = under @Store16LE (flip setBit 12)
+-- >   bitclearENABLE :: MYREG16 -> MYREG16
+-- >   bitclearENABLE = under @Store16LE (flip clearBit 12)
+-- >   bittoggleENABLE :: MYREG16 -> MYREG16
+-- >   bittoggleENABLE = under @Store16LE (flip complementBit 12)
 --
 field :: Name -> String -> String -> Q [Dec]
 field ty name bitstr = case bitstrToField bitstr of

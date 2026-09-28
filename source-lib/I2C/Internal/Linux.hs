@@ -18,16 +18,32 @@
 -- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 -- SOFTWARE.
 {-# LANGUAGE ForeignFunctionInterface #-}
+-- | 
+-- Module                  : I2C.Internal.Linux
+-- Description             : Backend implementation (Linux)
+-- SPDX-License-Identifier : MIT
+-- Copyright               : (c) karamellpelle@hotmail.com, 2026
+-- Maintainer              : karamellpelle@hotmail.com
+-- Stability               : experimental
+--
+-- Backend implementation
 module I2C.Internal.Linux
 (
+    -- * Implementation of the backend API
+
+    -- ** Chip connection
     BusDevice (..),
     openChip,
     closeChip,
 
+    -- ** Chip communication
     read,
     readSome,
     write,
     writeSome,
+
+    -- * Extra functionality on Linux 
+    chipTimeoutMs,
 
 ) where
 
@@ -53,18 +69,22 @@ import I2C.Exception
 --------------------------------------------------------------------------------
 --  
 
--- | connection to a hardware device on bus
+-- | A connection to a hardware device 
 data BusDevice chip = 
     BusDevice Text ChipAddress (Ptr I2C_Client) 
 
 
--- | instance Show
 instance Chip chip => Show (BusDevice chip) where
     show (BusDevice id addr _ptr) = "(BusDevice " <> (toString $ chipName @chip) <> " " <> show addr <> "@" <> toString id <> ")"
 
 
--- | opens a connection to chip based on bus identifier and hardware address.
-openChip :: forall chip . (Chip chip) => Text -> ChipAddress -> IO (BusDevice chip)
+-- | Open a connection to a chip of type 'chip' based on bus identifier and hardware address on bus.
+--   The bus identifier on Linux is typically something like @\/dev\/i2c-N@.
+--   May throw 'I2CErr'.
+openChip :: forall chip . (Chip chip) => 
+            Text ->                       -- ^ Bus identifier
+            ChipAddress ->                -- ^ __7 bit hardware address__ on bus
+            IO (BusDevice chip)
 openChip busid addr = do
     (try @IOException $ openFd (fromIdentifier busid) ReadWrite defaultFileFlags) >>= \case
         Left err   -> throwIO $ fromIOException err
@@ -77,9 +97,9 @@ openChip busid addr = do
       fdToPtrI2C_Client = intPtrToPtr . fromIntegral 
 
 
--- | close connection to chip
+-- | Close connection to chip
 closeChip :: forall chip . (Chip chip) => BusDevice chip -> IO ()
-closeChip (BusDevice _id _addr ptr) = do
+closeChip busdev@(BusDevice _id _addr ptr) = do
     (try @IOException $ closeFd $ ptrI2C_ClientToFd ptr) >>= \case
         Left err  -> throwIO $ fromIOException err
         Right _   -> pure ()
@@ -87,8 +107,11 @@ closeChip (BusDevice _id _addr ptr) = do
       ptrI2C_ClientToFd = fromIntegral . ptrToIntPtr 
 
 
--- | set timeout for transfers
-chipTimeoutMs :: forall chip . (Chip chip) => BusDevice chip -> Word -> IO ()
+-- | Set timeout for transfers. 
+chipTimeoutMs :: forall chip . (Chip chip) => 
+                 BusDevice chip ->                -- BusDevice
+                 Word ->                          -- Time in milliseconds
+                 IO ()
 chipTimeoutMs busdev@(BusDevice _id _addr ptr) ms = do
     assertOK' tagErr $ c_ioctl (ptrI2C_ClientToFd ptr) c_I2C_TIMEOUT $ fromIntegral $ div ms 10
     pure ()
@@ -100,17 +123,22 @@ chipTimeoutMs busdev@(BusDevice _id _addr ptr) ms = do
 --------------------------------------------------------------------------------
 --  internal transaction API
 
--- |  read a specific amount of bytes determined by 'Storable r'. the reading
---    can be prefixed by a write of a specific amount of bytes determined by
---    'Storable w' if and only if 'sizeOf w' is non-zero. it is very
---    encouraged that the backend implement this as a "repeated START" 
---    transaction, since that is whole reason for the 'w' parameter.
+-- |  Read a specific amount of bytes. The reading can be prefixed by a write 
+--    of a specific amount of bytes if size is non-zero. 
+--
+--    it is very encouraged that the backend implement this as a "repeated START" 
+--    transaction, since that's the whole reason for the write parameter.
 --  
---      * call shall fail if 'w' can't be written fully.
---      * call shall fail if 'r' can't be read fully
+--      * Call shall fail if 'w' can't be written fully.
+--      * Call shall fail if 'r' can't be read fully
 --
 read :: forall chip w r . (Chip chip)  => 
-        BusDevice chip -> Int -> (Ptr w -> IO ()) -> Int -> (Ptr r -> IO r) -> IO r
+        BusDevice chip ->                   -- ^ BusDevice
+        Int ->                              -- ^ Number of bytes to write
+        (Ptr w -> IO ()) ->                 -- ^ Write bytes
+        Int ->                              -- ^ Number of bytes to read
+        (Ptr r -> IO r) ->                  -- ^ Read bytes into type 'r' 
+        IO r
 read busdev@(BusDevice _id addr ptr) sizeW pokeW sizeR peekR = do
     let size = max sizeW sizeR
         withMem = if size <= maxAllocaBytes then allocaBytes else mallocBytes'

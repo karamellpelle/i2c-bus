@@ -17,20 +17,52 @@
 -- LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 -- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 -- SOFTWARE.
+
+-- | 
+-- Module                  : I2C
+-- Description             : Main module
+-- SPDX-License-Identifier : MIT
+-- Copyright               : (c) karamellpelle@hotmail.com, 2026
+-- Maintainer              : karamellpelle@hotmail.com
+-- Stability               : experimental
+-- 
+-- Main module for communication on the I2C bus. It will typically 
+-- give you all you need.
+--
+-- Example: 
+--
+-- > {-# LANGUAGE TemplateHaskell #-}
+-- > import I2C
+-- >
+-- > $(chip "PCF8575")
+-- > 
+-- > testPCF8575 :: IO ()
+-- > testPCF8575 = do
+-- >     busdev <- openChip @PCF8575 "/dev/i2c-1" 0x20
+-- >     
+-- >     forM_ [0..0x00FF] $ \ix -> do
+-- >         rawwrite @Store16LE busdev ix
+-- >         threadDelay 400000
+--
 module I2C
 (
-    
-    I2CErr (..),
     Chip (..),
-
     BusDevice,
+
+    -- * Chip connection
     openChip,
     closeChip,
 
-    module I2C.TH,
+    -- * Primitives
     module I2C.Types,
+    -- * Raw communication using 'Foreign.Storable'
     module I2C.Raw,
+    -- * Registers utilities
     module I2C.Register,
+    -- * Template Haskell
+    module I2C.TH,
+    -- * Exception
+    I2CErr (..),
 ) where
 
 import I2C.Types

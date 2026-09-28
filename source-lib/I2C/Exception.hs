@@ -17,9 +17,18 @@
 -- LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 -- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 -- SOFTWARE.
+-- | 
+-- Module                  : I2C.Exception
+-- Description             : Exception from this library
+-- SPDX-License-Identifier : MIT
+-- Copyright               : (c) karamellpelle@hotmail.com, 2026
+-- Maintainer              : karamellpelle@hotmail.com
+-- Stability               : experimental
 module I2C.Exception
 (
     I2CErr (..),
+
+    -- ** Utils 
     errI2C,
     fromIOException,
 
@@ -37,6 +46,7 @@ import Text.Show qualified
 --------------------------------------------------------------------------------
 --  exception
 
+-- | Our exception type
 data I2CErr = I2CErr Errno Text
 
 
@@ -51,10 +61,11 @@ instance Show I2CErr where
             _  -> toString $ text
 
 
+-- | Create 'I2CErr' from 'Errno' and descrition
 errI2C :: Errno -> Text -> I2CErr
 errI2C = I2CErr
 
-
+-- | Convert an 'IOException' to 'I2CErr'
 fromIOException :: IOException -> I2CErr
 fromIOException err = 
     errI2C (wrap @Errno $ ioe_errno err ?: 1) $ toText (displayException err)

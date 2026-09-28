@@ -17,22 +17,37 @@
 -- LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 -- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 -- SOFTWARE.
+-- | 
+-- Module                  : I2C.Types
+-- Description             : Primitives
+-- SPDX-License-Identifier : MIT
+-- Copyright               : (c) karamellpelle@hotmail.com, 2026
+-- Maintainer              : karamellpelle@hotmail.com
+-- Stability               : experimental
 {-# LANGUAGE CPP #-}
 module I2C.Types
 (
+    -- * Chip addressing
     ChipAddress (..),
     fromChipAddress,
 
+    -- * Register addressing
     RegisterAddress (..),
     fromRegisterAddress,
-    
+   
+    -- * Basic data types 
     Store8 (..),
+
+    -- ** Little endian
     Store16LE (..),
     Store32LE (..),
     Store64LE (..),
+    -- ** Big endian
     Store16BE (..),
     Store32BE (..),
     Store64BE (..),
+
+    -- * Other Storable's
     StorableAB (..),
 ) where
 
@@ -48,7 +63,7 @@ import Data.Char (toUpper)
 --------------------------------------------------------------------------------
 --  chip address
 
--- | hardware's _7 bit_ address on I2C bus, i.e. the 8 bit R/W addresses shifted down by 1
+-- | A chip's __7 bit__ hardware address on an I2C bus, i.e. the 8 bit R/W addresses shifted down by 1
 newtype ChipAddress = ChipAddress Word8
     deriving (Num)
 
@@ -56,7 +71,7 @@ instance Show ChipAddress where
     show (ChipAddress w) = 
         (if 0x10 <= w then "0x" else "0x0") <> fmap toUpper (showHex w "")
 
--- | convert from ChipAddress
+-- | Convert from 'ChipAddress'
 fromChipAddress :: Num b => ChipAddress -> b
 fromChipAddress (ChipAddress addr) = fromIntegral addr
 
@@ -65,7 +80,7 @@ fromChipAddress (ChipAddress addr) = fromIntegral addr
 --  registers addressing inside chips
 --  our register addresses are always of size 1 byte 
 
--- | register address
+-- | Register address
 newtype RegisterAddress = RegisterAddress Word8
     deriving (Num, Storable)
 
@@ -73,6 +88,7 @@ instance Show RegisterAddress where
     show (RegisterAddress w) =
         (if 0x10 <= w then "0x" else "0x0") <> fmap toUpper (showHex w "")
 
+-- | Convert from 'RegisterAddress'
 fromRegisterAddress :: Num b => RegisterAddress -> b
 fromRegisterAddress (RegisterAddress addr) = fromIntegral addr
 
@@ -173,7 +189,7 @@ instance Storable Store64BE where
 --------------------------------------------------------------------------------
 --  Storable pair
 
--- | a storable representation _on the I2C chip_ of 'a' and 'b'
+-- | a storable representation __on the I2C hardware__ of 'a' and 'b'
 data StorableAB a b = 
     StorableAB !a !b
 
@@ -188,7 +204,7 @@ instance (Storable a, Storable b) => Storable (StorableAB a b) where
     poke = \ptr (StorableAB a b) -> do
         poke (plusPtr ptr 0) $ a
         poke (plusPtr ptr $ sizeOf a) $ b
-    -- NOTE: since an I2C chip typically uses "continuous bytes", 
+    -- NOTE: since an I2C chip typically are "continuous bytes", 
     --       I guess aligment is irrelevant for peek and poke here
 
 

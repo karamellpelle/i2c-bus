@@ -17,8 +17,16 @@
 -- LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 -- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 -- SOFTWARE.
+-- | 
+-- Module                  : I2C.Raw
+-- Description             : Read and write based on 'Storable' types
+-- SPDX-License-Identifier : MIT
+-- Copyright               : (c) karamellpelle@hotmail.com, 2026
+-- Maintainer              : karamellpelle@hotmail.com
+-- Stability               : experimental
 module I2C.Raw
 (
+    -- 
     rawread,
     rawwrite,
     rawmodify,

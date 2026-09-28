@@ -17,17 +17,28 @@
 -- LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 -- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 -- SOFTWARE.
+-- | 
+-- Module                  : I2C.Register
+-- Description             : Utilities for working with chips with registers
+-- SPDX-License-Identifier : MIT
+-- Copyright               : (c) karamellpelle@hotmail.com, 2026
+-- Maintainer              : karamellpelle@hotmail.com
+-- Stability               : experimental
 module I2C.Register
 (
+    -- * Register addressing type 
     Register (..),
 
+    -- * Read and write registers
     regread,
     regwrite,
     regmodify,
 
+    -- * Read and write registers (direct addressing)
     regread',
     regwrite',
     regmodify',
+
 ) where
 
 import Relude
@@ -43,7 +54,7 @@ import I2C.Types
 --------------------------------------------------------------------------------
 --  Register
 
--- | index to a register of type 't' of a chip 
+-- | Index to a register of type 't' of a chip 
 data Register chip t = Register Text RegisterAddress
 
 
