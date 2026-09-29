@@ -18,15 +18,16 @@
 -- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 -- SOFTWARE.
 {-# LANGUAGE ForeignFunctionInterface #-}
+--------------------------------------------------------------------------------
 -- | 
 -- Module                  : I2C.Internal.Linux
 -- Description             : Backend implementation (Linux)
 -- SPDX-License-Identifier : MIT
--- Copyright               : (c) karamellpelle@hotmail.com, 2026
+-- Copyright               : karamellpelle@hotmail.com
 -- Maintainer              : karamellpelle@hotmail.com
 -- Stability               : experimental
---
--- Backend implementation
+-- Portability             : Linux
+--------------------------------------------------------------------------------
 module I2C.Internal.Linux
 (
     -- * Implementation of the backend API
@@ -37,10 +38,10 @@ module I2C.Internal.Linux
     closeChip,
 
     -- ** Chip communication
-    read,
-    readSome,
     write,
+    read,
     writeSome,
+    readSome,
 
     -- * Extra functionality on Linux 
     chipTimeoutMs,
@@ -69,7 +70,7 @@ import I2C.Exception
 --------------------------------------------------------------------------------
 --  
 
--- | A connection to a hardware device 
+-- | A connection to a hardware device on bus 
 data BusDevice chip = 
     BusDevice Text ChipAddress (Ptr I2C_Client) 
 
@@ -83,7 +84,7 @@ instance Chip chip => Show (BusDevice chip) where
 --   May throw 'I2CErr'.
 openChip :: forall chip . (Chip chip) => 
             Text ->                       -- ^ Bus identifier
-            ChipAddress ->                -- ^ __7 bit hardware address__ on bus
+            ChipAddress ->                -- ^ /7 bit/ hardware address on bus
             IO (BusDevice chip)
 openChip busid addr = do
     (try @IOException $ openFd (fromIdentifier busid) ReadWrite defaultFileFlags) >>= \case

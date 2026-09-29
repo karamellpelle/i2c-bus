@@ -21,7 +21,7 @@
 -- Module                  : I2C.Types
 -- Description             : Primitives
 -- SPDX-License-Identifier : MIT
--- Copyright               : (c) karamellpelle@hotmail.com, 2026
+-- Copyright               : karamellpelle@hotmail.com
 -- Maintainer              : karamellpelle@hotmail.com
 -- Stability               : experimental
 {-# LANGUAGE CPP #-}
@@ -35,7 +35,7 @@ module I2C.Types
     RegisterAddress (..),
     fromRegisterAddress,
    
-    -- * Basic data types 
+    -- * Basic storable types 
     Store8 (..),
 
     -- ** Little endian
@@ -47,7 +47,7 @@ module I2C.Types
     Store32BE (..),
     Store64BE (..),
 
-    -- * Other Storable's
+    -- * Other
     StorableAB (..),
 ) where
 
@@ -189,7 +189,7 @@ instance Storable Store64BE where
 --------------------------------------------------------------------------------
 --  Storable pair
 
--- | a storable representation __on the I2C hardware__ of 'a' and 'b'
+-- | A storable representation of 'a' and 'b' on a chip
 data StorableAB a b = 
     StorableAB !a !b
 

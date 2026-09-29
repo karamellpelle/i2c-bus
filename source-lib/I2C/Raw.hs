@@ -17,16 +17,20 @@
 -- LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 -- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 -- SOFTWARE.
+--------------------------------------------------------------------------------
 -- | 
 -- Module                  : I2C.Raw
 -- Description             : Read and write based on 'Storable' types
 -- SPDX-License-Identifier : MIT
--- Copyright               : (c) karamellpelle@hotmail.com, 2026
+-- Copyright               : karamellpelle@hotmail.com
 -- Maintainer              : karamellpelle@hotmail.com
 -- Stability               : experimental
+--
+-- Read and write using 'Storable' types.
+--------------------------------------------------------------------------------
 module I2C.Raw
 (
-    -- 
+    -- * 
     rawread,
     rawwrite,
     rawmodify,
@@ -43,18 +47,17 @@ import I2C.Chip
 -- raw read and write without registers
 -- 
 
+-- | Read data of type 'a' on chip.
 rawread :: forall a chip m . (Chip chip, Storable a, MonadIO m) => Internal.BusDevice chip -> m a
 rawread busdev = liftIO $ 
     Internal.read busdev 0 (const $ pure ()) (sizeOf @a undefined) peek
 
---rawreadSome :: forall chip m . (Chip chip, MonadIO m) => Internal.BusDevice chip -> m ByteString
---rawreadSome busdev = liftIO $
---    Internal.readSome busdev ()
-
+-- | Write data of type 'a' on chip.
 rawwrite :: forall a chip m . (Chip chip, Storable a, MonadIO m)  => Internal.BusDevice chip -> a -> m ()
 rawwrite busdev = \w -> liftIO $
     Internal.write busdev (sizeOf w) (flip poke w)
 
+-- | Modify data of type 'a' on chip.
 rawmodify :: forall a chip m . (Chip chip, Storable a, MonadIO m)  => Internal.BusDevice chip -> (a -> a) -> m a
 rawmodify busdev = \f -> liftIO $ do
     a <- rawread busdev

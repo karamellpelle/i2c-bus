@@ -18,38 +18,44 @@
 -- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 -- SOFTWARE.
 {-# LANGUAGE TemplateHaskell #-}
+--------------------------------------------------------------------------------
 -- | 
 -- Module                  : I2C.TH
 -- Description             : Chips and registers utilities 
 -- SPDX-License-Identifier : MIT
--- Copyright               : (c) karamellpelle@hotmail.com, 2026
+-- Copyright               : karamellpelle@hotmail.com
 -- Maintainer              : karamellpelle@hotmail.com
 -- Stability               : experimental
 --
--- Create chips and registers through Template Haskell
+-- Create chips, registers and fields easily using Template Haskell.
 --------------------------------------------------------------------------------
 module I2C.TH
 (
-    -- * Imperative TH settings
-    setDefaults,
-    setPrefixRegister,
-
     -- * Create Chips
     chip,
-    instanceChip,
+    --instanceChip,
 
     -- * Create Registers
     register,
     register8,
+    -- ** Little endian
     register16LE,
-    register16BE,
     register32LE,
-    register32BE,
     register64LE,
+    -- ** Big endian
+    register16BE,
+    register32BE,
     register64BE,
 
     -- * Create fields
     field,
+
+    -- * Imperative TH settings
+    -- $settings
+    --
+    setDefaults,
+    setPrefixRegister,
+
 
 ) where
 
@@ -77,6 +83,13 @@ import Language.Haskell.TH.Lib
 --  create Chips and Registers through Template Haskell !
 --------------------------------------------------------------------------------
 
+-- $settings
+--
+-- Settings that control how code is generated. A new setting only applies to 
+-- the TH calls that follows. Hence, you can have different settings for different
+-- calls.
+-- 
+
 data QSetting = QSetting {
                 qsettingPrefixRegister :: String 
               --, qsettingShowHex :: Bool
@@ -87,7 +100,7 @@ instance Default QSetting where
           qsettingPrefixRegister = "reg"
         }
 
--- | Restore "factory settings"
+-- | Restore to default settings
 setDefaults :: String -> Q [Dec]
 setDefaults pre = do
     putQ @QSetting def 
@@ -104,7 +117,8 @@ setDefaults pre = do
 -- >   instance Chip MYCHIP where
 -- >     chipName = "MYCHIP"
 --
-chip :: String -> Q [Dec]
+chip :: String -> -- ^ Name of data type
+        Q [Dec]
 chip name = do
     let name' = mkName name
     dData <- decData name' 
@@ -127,7 +141,7 @@ instanceChip ty = do
 --  Register
 
 
--- | Declare a 'Register' of 'Chip' from 'Storable'.
+-- | Declare a 'Register' of a chip from 'Storable'.
 --   Storable is relative to the chip's hardware
 --
 -- > $(register ''MPU6050 0x41 "TEMP_OUT" ''TemperatureC)
@@ -135,7 +149,11 @@ instanceChip ty = do
 -- >   regTEMP_OUT :: Register MPU6050 TemperatureC
 -- >   regTEMP_OUT = Register "TEMP_OUT" 65
 --
-register :: Name -> RegisterAddress -> String -> Name -> Q [Dec]
+register :: Name ->             -- ^ Chip this register belongs to
+            RegisterAddress ->  -- ^ Register address on chip
+            String ->           -- ^ Register name
+            Name ->             -- ^ Contained data type. Must be an instance of 'Storable'.
+            Q [Dec]
 register tychip addr name ty = do
     regname <- mkNameRegister name
     pure  [ SigD regname (AppT (AppT (ConT ''Register) (ConT tychip)) (ConT ty))
@@ -157,7 +175,11 @@ register tychip addr name ty = do
 -- >     Text.Show.show = I2C.TH.showRegT8Bin "MY8"
 -- >   regMY8 :: Register MYCHIP MY8
 -- >   regMY8 = Register "MY8" 34
-register8 :: Name -> RegisterAddress -> String -> Word8 -> Q [Dec]
+register8 :: Name ->            -- ^ Chip this register belongs to
+             RegisterAddress -> -- ^ Register address on chip      
+             String ->          -- ^ Register name                 
+             Word8 ->           -- ^ Default value (if any)
+             Q [Dec]
 register8 tychip addr name def =
     registerN tychip addr name def ''Store8 'showRegT8Bin
     
@@ -203,8 +225,7 @@ registerN tychip addr name def tywrap showf = do
     pure $ [dNewtype, dInstanceDefault, dInstanceShow] <> dRegister
 
 
--- | Change prefix for declared Register values
---
+-- | Set prefix for declared Register values. Default prefix is @reg@.
 setPrefixRegister :: String -> Q [Dec]
 setPrefixRegister pre = do
     assertValid pre
@@ -223,23 +244,29 @@ setPrefixRegister pre = do
 --------------------------------------------------------------------------------
 --  fields
 
--- | Declare a field of a register; take a part of a register and make a type
+-- | Define a data type inside a register. The subset is defined by a string 
+-- having the same length as the bitsize of the register, wherein the  @*@ characters
+-- defines the field (other characters are considered placeholders).
+--
+-- If the subset is a 1 bit set, then additional code for bit manipulation will be 
+-- generated too.
+--
 --
 -- > $(field ''MYREG8 "VALUES" "00***000")
 -- > ======>
--- >   getVALUES :: Integral n => MYREG8 -> n
+-- >   getVALUES :: MYREG8 -> Word8
 -- >   getVALUES
 -- >     = \w -> (fromIntegral $ (unsafeShiftR (un @Store8 w) 3 .&. 7))
--- >   setVALUES :: Integral n => n -> MYREG8 -> MYREG8
+-- >   setVALUES :: Word8 -> MYREG8 -> MYREG8
 -- >   setVALUES
 -- >     = \ n -> (under @Store8 $ (\ w -> ((w .&. complement 56) .|. unsafeShiftL (7 .&. fromIntegral n) 3)))
 -- >
 -- > $(field ''MYREG16 "ENABLE" "000*000000000000")
 -- > ======>
--- >   getENABLE :: Integral n => MYREG16 -> n
+-- >   getENABLE :: MYREG16 -> Word16
 -- >   getENABLE
 -- >     = \w -> (fromIntegral $ (unsafeShiftR (un @Store16LE w) 12 .&. 1))
--- >   setENABLE :: Integral n => n -> MYREG16 -> MYREG16
+-- >   setENABLE :: Word16 -> MYREG16 -> MYREG16
 -- >   setENABLE
 -- >     = \ n -> (under @Store16LE $ (\ w -> ((w .&. complement 4096) .|. unsafeShiftL (1 .&. fromIntegral n) 12)))
 -- >   bitsetENABLE :: MYREG16 -> MYREG16
@@ -249,7 +276,10 @@ setPrefixRegister pre = do
 -- >   bittoggleENABLE :: MYREG16 -> MYREG16
 -- >   bittoggleENABLE = under @Store16LE (flip complementBit 12)
 --
-field :: Name -> String -> String -> Q [Dec]
+field :: Name ->      -- ^ Which register the field is contained in
+         String ->    -- ^ Name of field
+         String ->    -- ^ String that defines the field.
+         Q [Dec]
 field ty name bitstr = case bitstrToField bitstr of
     Left err              -> fail err
     Right sil@(size, ix, len) -> do

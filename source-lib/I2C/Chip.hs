@@ -21,7 +21,7 @@
 -- Module                  : I2C.Chip
 -- Description             : Chip type
 -- SPDX-License-Identifier : MIT
--- Copyright               : (c) karamellpelle@hotmail.com, 2026
+-- Copyright               : karamellpelle@hotmail.com
 -- Maintainer              : karamellpelle@hotmail.com
 -- Stability               : experimental
 --

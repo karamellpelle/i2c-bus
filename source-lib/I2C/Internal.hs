@@ -17,17 +17,22 @@
 -- LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 -- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 -- SOFTWARE.
+--------------------------------------------------------------------------------
 -- | 
 -- Module                  : I2C.Internal
 -- Description             : Backend
 -- SPDX-License-Identifier : MIT
--- Copyright               : (c) karamellpelle@hotmail.com, 2026
+-- Copyright               : karamellpelle@hotmail.com
 -- Maintainer              : karamellpelle@hotmail.com
 -- Stability               : experimental
+--------------------------------------------------------------------------------
 {-# LANGUAGE CPP #-}
 module I2C.Internal
 (
-    -- export selected backend
+    -- $info
+
+    -- * Reexported backend
+    --
 #ifdef INTERNAL_USE_LINUX
     module I2C.Internal.Linux,
 #endif
@@ -40,47 +45,17 @@ import Relude
 import I2C.Internal.Linux
 #endif
 
---------------------------------------------------------------------------------
---  backend API:
-
-
--- | connection to a hardware device on bus
--- BusDevice chip (..)
-
--- | open a connection to chip based on bus identifier.
--- openChip :: forall chip . (Chip chip) => Text -> IO (BusDevice chip)
--- closeChip :: forall chip . (Chip chip) => BusDevice chip -> IO ()
-
--- | close connection to chip
---closeChip :: forall chip . (Chip chip) => BusDevice chip -> IO ()
-
--- |  read a specific amount of bytes determined by 'Storable r'. the reading
---    can be prefixed by a write of a specific amount of bytes determined by
---    'Storable w' if and only if 'sizeOf w' is non-zero. it is very
---    encouraged that the backend implement this as a "repeated START" 
---    transaction, since that is whole reason for the 'w' parameter.
---  
---      * call shall fail if 'w' can't be written fully.
---      * call shall fail if 'r' can't be read fully
+-- $info
 --
---read :: forall chip w r . (Chip chip, Storable w, Storable r)  => BusDevice chip -> w -> IO r
-
--- |  read an arbitrary amount of bytes until NACK by slave. the reading
---    can be prefixed by a write of a specific amount of bytes determined by
---    'Storable w' if and only if 'sizeOf w' is non-zero. it is very
---    encouraged that the backend implement this as a "repeated START" 
---    transaction, since that is whole reason for the 'w' parameter.
---  
---      * call shall fail if 'w' can't be written fully.
---      * call can fail if the slave does not NACK after reading a larger number 
---        of bytes determined by the backend (typically by filling up a buffer).
+-- This module reexports the backend. A backend must implement the following:
 --
---readSome :: forall chip w . (Chip chip, Storable w) => BusDevice chip -> w -> IO ByteString
-
--- |  write a specific amount of bytes determined by 'Storable w'.
---      * call shall fail if 'w' can't be written fully.
---write :: forall chip w . (Chip chip, Storable w) => BusDevice chip -> w -> IO ()
-
--- |  write an arbitrary amount of bytes until NACK by slave. returns the number
---    of bytes written.
---writeSome :: forall chip w r . (Chip chip) => BusDevice chip -> ByteString -> IO Word
+--  > data BusDevice chip
+--  > openChip :: (Chip chip) => Text -> ChipAddress -> IO (BusDevice chip)
+--  > closeChip :: (Chip chip) => BusDevice chip -> IO ()
+--  > write :: (Chip chip) => BusDevice chip -> Int -> (Ptr w -> IO ()) -> IO ()
+--  > read :: (Chip chip)  => BusDevice chip -> Int -> (Ptr w -> IO ()) -> Int -> (Ptr r -> IO r) -> IO r
+--  > writeSome :: (Chip chip) => BusDevice chip -> Int -> (Ptr w -> IO ()) -> IO Int
+--  > readSome :: (Chip chip) => BusDevice chip -> Int -> (Ptr w -> IO ()) -> Int -> (Int -> Ptr r -> IO r)-> IO r
+--
+-- See the documentation in "I2C.Internal.Linux" for more information on how a backend 
+-- implementation should behave.

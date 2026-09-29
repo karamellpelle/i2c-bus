@@ -17,13 +17,15 @@
 -- LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 -- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 -- SOFTWARE.
+--------------------------------------------------------------------------------
 -- | 
 -- Module                  : I2C.Exception
 -- Description             : Exception from this library
 -- SPDX-License-Identifier : MIT
--- Copyright               : (c) karamellpelle@hotmail.com, 2026
+-- Copyright               : karamellpelle@hotmail.com
 -- Maintainer              : karamellpelle@hotmail.com
 -- Stability               : experimental
+--------------------------------------------------------------------------------
 module I2C.Exception
 (
     I2CErr (..),
@@ -46,7 +48,7 @@ import Text.Show qualified
 --------------------------------------------------------------------------------
 --  exception
 
--- | Our exception type
+-- | Exception type
 data I2CErr = I2CErr Errno Text
 
 
