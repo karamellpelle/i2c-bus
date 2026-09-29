@@ -65,7 +65,7 @@ instance Chip chip => Show (BusDevice chip) where
 --   May throw 'I2CErr'.
 openChip :: forall chip . (Chip chip) => 
             Text ->                       -- ^ Bus identifier
-            ChipAddress ->                -- ^ /7 bit/ hardware address on bus
+            ChipAddress ->                -- ^ /7 bit/ hardware address
             IO (BusDevice chip)
 openChip busid addr = do
     (try @IOException $ openFd (fromIdentifier busid) ReadWrite defaultFileFlags) >>= \case
@@ -79,7 +79,8 @@ openChip busid addr = do
       fdToPtrI2C_Client = intPtrToPtr . fromIntegral 
 
 
--- | Close connection to chip
+-- | Close connection to chip. 
+--   Shall not throw 'I2CErr'.
 closeChip :: forall chip . (Chip chip) => BusDevice chip -> IO ()
 closeChip busdev@(BusDevice _id _addr ptr) = do
     (try @IOException $ closeFd $ ptrI2C_ClientToFd ptr) >>= \case
@@ -89,10 +90,11 @@ closeChip busdev@(BusDevice _id _addr ptr) = do
       ptrI2C_ClientToFd = fromIntegral . ptrToIntPtr 
 
 
--- | Set timeout for transfers. 
+-- | Set timeout for transfers.
+--   May throw 'I2CErr'.
 chipTimeoutMs :: forall chip . (Chip chip) => 
-                 BusDevice chip ->                -- BusDevice
-                 Word ->                          -- Time in milliseconds
+                 BusDevice chip ->                -- ^ BusDevice
+                 Word ->                          -- ^ Time in milliseconds
                  IO ()
 chipTimeoutMs busdev@(BusDevice _id _addr ptr) ms = do
     assertOK' tagErr $ c_ioctl (ptrI2C_ClientToFd ptr) c_I2C_TIMEOUT $ fromIntegral $ div ms 10
@@ -105,14 +107,41 @@ chipTimeoutMs busdev@(BusDevice _id _addr ptr) ms = do
 --------------------------------------------------------------------------------
 --  internal transaction API
 
--- |  Read a specific amount of bytes. The reading can be prefixed by a write 
---    of a specific amount of bytes if size is non-zero. 
+-- |  Write a specific amount of bytes.
 --
---    it is very encouraged that the backend implement this as a "repeated START" 
---    transaction, since that's the whole reason for the write parameter.
+--    May throw 'I2CErr', some specific cases are:
+--
+--      * Call shall fail if 'w' can't be written fully.
+--
+write :: forall chip w . (Chip chip) => 
+         BusDevice chip ->              -- ^ BusDevice
+         Int ->                         -- ^ Number of bytes to write 
+         (Ptr w -> IO ())               -- ^ Write bytes 
+         -> IO ()
+write busdev@(BusDevice _id addr ptr) sizeW pokeW = do
+    let withMem = if sizeW <= maxAllocaBytes then allocaBytes else mallocBytes'
+
+    res <- try @IOException $ withMem sizeW $ \mem -> do
+        pokeW $ castPtr mem
+        assertOK' (tagErr busdev) $ c_i2c_write ptr (fromChipAddress addr) mem (fI sizeW)
+        pure ()
+    case res of
+        Right a   -> pure a
+        Left err  -> throwIO $ fromIOException err
+    where
+      tagErr busdev = "write " <> show busdev
+      mallocBytes' size f = bracket (mallocBytes size) free f
+    
+-- |  Read a specific amount of bytes. The reading can be prefixed by a write 
+--    of a given amount of bytes if that size is non-zero. 
+--
+--    It is very encouraged that the backend implement this as a "repeated START" 
+--    transaction, since that's the whole reason for the write parameter. 
+--
+--    May throw 'I2CErr', some special cases are: 
 --  
 --      * Call shall fail if 'w' can't be written fully.
---      * Call shall fail if 'r' can't be read fully
+--      * Call shall fail if 'r' can't be read fully.
 --
 read :: forall chip w r . (Chip chip)  => 
         BusDevice chip ->                   -- ^ BusDevice
@@ -140,54 +169,54 @@ read busdev@(BusDevice _id addr ptr) sizeW pokeW sizeR peekR = do
       mallocBytes' size f = bracket (mallocBytes size) free f
     
 
--- |  read an arbitrary amount of bytes until NACK by slave. the read
---    can be prefixed by a write of a specific amount of bytes determined by
---    'Storable w' if and only if 'sizeOf w' is non-zero. it is very
---    encouraged that the backend implement this as a "repeated START" 
---    transaction, since that is whole reason for the 'w' parameter.
---  
---      * call shall fail if 'w' can't be written fully.
---      * call can fail if the slave does not NACK after reading a larger number 
---        of bytes determined by the backend (typically by filling up a buffer).
+--------------------------------------------------------------------------------
+--  readSome / writeSome
 --
-readSome :: forall chip w r . (Chip chip) => 
-            BusDevice chip -> Int -> (Ptr w -> IO ()) -> Int -> (Int -> Ptr r -> IO r)-> IO r
-readSome busdev sizeW pokeW sizeR peekR' = 
-    throwIO $ errI2C eNOSYS "readSome not implemented on Linux"
+--  TODO: define events at which we should throw 'I2CErr'
 
 
--- |  write a specific amount of bytes determined by 'Storable w'.
---      * call shall fail if 'w' can't be written fully.
-write :: forall chip w . (Chip chip) => 
-         BusDevice chip -> Int -> (Ptr w -> IO ()) -> IO ()
-write busdev@(BusDevice _id addr ptr) sizeW pokeW = do
-    let withMem = if sizeW <= maxAllocaBytes then allocaBytes else mallocBytes'
-
-    res <- try @IOException $ withMem sizeW $ \mem -> do
-        pokeW $ castPtr mem
-        assertOK' (tagErr busdev) $ c_i2c_write ptr (fromChipAddress addr) mem (fI sizeW)
-        pure ()
-    case res of
-        Right a   -> pure a
-        Left err  -> throwIO $ fromIOException err
-    where
-      tagErr busdev = "write " <> show busdev
-      mallocBytes' size f = bracket (mallocBytes size) free f
-    
-    
-
--- |  write an arbitrary amount of bytes until NACK by slave. returns the number
+-- |  Write an arbitrary amount of bytes until completion or NACK by slave. Returns the number
 --    of bytes written.
---      * FIXME: can call fail if the slave does not NACK after reading a larger number 
---        of bytes determined by the backend (typically by filling up a buffer)?
-writeSome :: forall chip w . (Chip chip) => BusDevice chip -> Int -> (Ptr w -> IO ()) -> IO Int
+--
+--    May throw 'I2CErr'. 
+writeSome :: forall chip w . (Chip chip) => 
+             BusDevice chip ->              -- ^ BusDevice
+             Int ->                         -- ^ Number of bytes to write
+             (Ptr w -> IO ()) ->            -- ^ Write bytes 
+             IO Int
 writeSome busdev sizeW pokeW =
     throwIO $ errI2C eNOSYS "writeSome not implemented on Linux"
+{-# WARNING writeSome "Not implemented on Linux; throws 'I2CErr'" #-}
 
+-- |  Read until NACK by slave or the specific amount of bytes have been read.
+--    The reading can be prefixed by a write of a given amount of bytes 
+--    if that size is non-zero. 
+--
+--    It is very encouraged that the backend implement this as a "repeated START" 
+--    transaction, since that's the whole reason for the write parameter. 
+--
+--    May throw 'I2CErr', some special cases are: 
+--  
+--      * Call shall fail if 'w' can't be written fully.
+--
+readSome :: forall chip w r . (Chip chip) => 
+            BusDevice chip ->                 -- ^ BusDevice
+            Int ->                            -- ^ Number of bytes to write 
+            (Ptr w -> IO ()) ->               -- ^ Write bytes 
+            Int ->                            -- ^ Number of bytes to read 
+            (Int -> Ptr r -> IO r)            -- ^ Read the given number of bytes into type 'r'. May throw 'I2CErr'.
+            -> IO r
+readSome busdev sizeW pokeW sizeR peekR' = 
+    throwIO $ errI2C eNOSYS "readSome not implemented on Linux"
+{-# WARNING readSome "Not implemented on Linux; throws 'I2CErr'" #-}
+
+
+ 
+--------------------------------------------------------------------------------
+--  
 
 -- | the maximal number of bytes allowed in a transaction for stack allocation.
 --   otherwise the memory is allocated on the heap. 
---   note that for 'read' and 'readSome' the size of the write part is included.
 maxAllocaBytes :: Int
 maxAllocaBytes = 128
 

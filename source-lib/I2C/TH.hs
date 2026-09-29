@@ -67,7 +67,7 @@ import Language.Haskell.TH.Lib
 -- $settings
 --
 -- Settings that control how code is generated. A new setting only applies to 
--- the TH calls that follows. Hence, you can have different settings for different
+-- the TH calls that follows, hence you can have different settings for different
 -- calls.
 -- 
 

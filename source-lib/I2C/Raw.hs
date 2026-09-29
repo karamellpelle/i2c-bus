@@ -7,7 +7,10 @@
 -- Maintainer              : karamellpelle@hotmail.com
 -- Stability               : experimental
 --
--- Read and write using 'Storable' types.
+-- Read and write using 'Storable' types. Note that the implementation of the
+-- Storable instance has to be relative to the chip hardware. For example, many
+-- EEPROMs use 2 bytes in big endian for addressing. "I2C.Types" has endian variants 
+-- which can be used.
 --------------------------------------------------------------------------------
 module I2C.Raw
 (
