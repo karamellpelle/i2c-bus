@@ -136,6 +136,7 @@ register :: Name ->             -- ^ Chip this register belongs to
             Name ->             -- ^ Contained data type. Must be an instance of 'Storable'.
             Q [Dec]
 register tychip addr name ty = do
+    assertNameRegister name
     regname <- mkNameRegister name
     pure  [ SigD regname (AppT (AppT (ConT ''Register) (ConT tychip)) (ConT ty))
           , ValD (VarP regname) (NormalB (AppE (AppE (ConE 'Register) (LitE (StringL name))) (LitE (IntegerL $ fromRegisterAddress addr)))) []
@@ -198,6 +199,7 @@ register64BE tychip addr name def =
 
 registerN :: Integral n => Name -> RegisterAddress -> String -> n -> Name -> Name -> Q [Dec]
 registerN tychip addr name def tywrap showf = do
+    assertNameRegister name
     ty <- mkNameType name
     dNewtype <- decNewtype ty tywrap [''Storable, ''Eq]
     dInstanceDefault <- decInstanceDefault ty def
@@ -217,10 +219,21 @@ setPrefixRegister pre = do
     pure mempty
     where
       assertValid = \case 
-        ""      -> fail "Sorry, registers need valid prefix"
+        ""      -> fail "Sorry, registers must have a non-empty prefix"
         (c:cs)  -> do
             when (not $ isAlpha c && isLower c) $ fail "Sorry, registers must at least start with lowercase ASCII"
             pure () 
+
+-- | see 2.4 Identifiers and Operators: https://www.haskell.org/onlinereport/lexemes.html
+assertNameRegister :: String -> Q ()
+assertNameRegister name = case name of
+    ""      -> fail "Register names must be non-empty"
+    (c:cs)  -> do
+        -- first make sure we restrict characters to ASCII
+        when (not $ all isAscii name) $ fail "Invalid characters in Register name (non-ASCII)"
+
+        when (not $ isAsciiUpper c) $ fail "Register names must start with [A-Z]"
+        when (not $ all (\c -> isAlphaNum c || c == '_' || c == '\'') cs) $ fail "Register names must only contain alphanums, '_' or '\\''"
 
 --------------------------------------------------------------------------------
 --  fields
