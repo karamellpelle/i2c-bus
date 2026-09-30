@@ -33,18 +33,17 @@ module I2C
     Internal.BusDevice,
     openChip,
     closeChip,
+    I2CErr (..),
+    module I2C.Chip,
 
     -- * Primitives
     module I2C.Types,
-    module I2C.Chip,
     -- * Read and write Storable
     module I2C.Raw,
     -- * Registers utilities
     module I2C.Register,
     -- * Template Haskell
     module I2C.TH,
-    -- * Exception
-    I2CErr (..),
 ) where
 
 import Relude
