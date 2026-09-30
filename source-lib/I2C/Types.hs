@@ -12,10 +12,6 @@
 {-# LANGUAGE CPP #-}
 module I2C.Types
 (
-    -- * Chip addressing
-    ChipAddress (..),
-    fromChipAddress,
-
     -- * Basic storable types 
     Store8 (..),
 
@@ -40,21 +36,6 @@ import Numeric (showHex)
 import Data.Word
 import Foreign
 import Data.Char (toUpper)
-
---------------------------------------------------------------------------------
---  chip address
-
--- | A chip's __7 bit__ hardware address on an I2C bus, i.e. the 8 bit R/W addresses shifted down by 1
-newtype ChipAddress = ChipAddress Word8
-    deriving (Num)
-
-instance Show ChipAddress where
-    show (ChipAddress w) = 
-        (if 0x10 <= w then "0x" else "0x0") <> fmap toUpper (showHex w "")
-
--- | Convert from 'ChipAddress'
-fromChipAddress :: Num b => ChipAddress -> b
-fromChipAddress (ChipAddress addr) = fromIntegral addr
 
 
 

@@ -10,15 +10,20 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 module I2C.Chip
 (
+    -- * Chip
     Chip (..),
+    -- ** Chip addressing
+    ChipAddress (..),
+    fromChipAddress,
 
 
 ) where
 
 import Relude
 import Text.Show qualified
+import Numeric (showHex)
+import Data.Char (toUpper)
 
-import I2C.Types
 
 --------------------------------------------------------------------------------
 --  chip
@@ -30,3 +35,18 @@ class Chip chip where
     chipName :: Text
     chipName = "(unknown chip)"
 
+
+--------------------------------------------------------------------------------
+--  chip address
+
+-- | A chip's __7 bit__ hardware address on an I2C bus, i.e. the 8 bit R/W addresses shifted down by 1
+newtype ChipAddress = ChipAddress Word8
+    deriving (Num)
+
+instance Show ChipAddress where
+    show (ChipAddress w) = 
+        (if 0x10 <= w then "0x" else "0x0") <> fmap toUpper (showHex w "")
+
+-- | Convert from 'ChipAddress'
+fromChipAddress :: Num b => ChipAddress -> b
+fromChipAddress (ChipAddress addr) = fromIntegral addr

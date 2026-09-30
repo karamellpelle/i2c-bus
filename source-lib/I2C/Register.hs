@@ -13,6 +13,7 @@ module I2C.Register
 (
     -- * Register
     Register (..),
+    -- ** Register addressing
     RegisterAddress (..),
     fromRegisterAddress,
 
