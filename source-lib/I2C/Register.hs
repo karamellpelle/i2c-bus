@@ -13,6 +13,8 @@ module I2C.Register
 (
     -- * Register
     Register (..),
+    RegisterAddress (..),
+    fromRegisterAddress,
 
     -- * Read and write registers
     regread,
@@ -29,6 +31,8 @@ module I2C.Register
 import Relude
 import Data.Default
 import Text.Show qualified
+import Numeric (showHex)
+import Data.Char (toUpper)
 import Foreign
 
 import I2C.Internal qualified as Internal
@@ -39,8 +43,25 @@ import I2C.Types
 --------------------------------------------------------------------------------
 --  Register
 
+-- | Register addressing inside chips.
+--   Register addresses are always of size 1 byte.
+newtype RegisterAddress = RegisterAddress Word8
+    deriving (Num, Storable)
+
+instance Show RegisterAddress where
+    show (RegisterAddress w) =
+        (if 0x10 <= w then "0x" else "0x0") <> fmap toUpper (showHex w "")
+
+-- | Convert from 'RegisterAddress'
+fromRegisterAddress :: Num b => RegisterAddress -> b
+fromRegisterAddress (RegisterAddress addr) = fromIntegral addr
+
 -- | Index into register of type 't' of a chip of type 'chip'
 data Register chip t = Register Text RegisterAddress
+
+
+--------------------------------------------------------------------------------
+--  using Register
 
 -- | Read register
 regread :: (Chip chip, Storable a, MonadIO m) => Internal.BusDevice chip -> Register chip a -> m a

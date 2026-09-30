@@ -16,10 +16,6 @@ module I2C.Types
     ChipAddress (..),
     fromChipAddress,
 
-    -- * Register addressing
-    RegisterAddress (..),
-    fromRegisterAddress,
-   
     -- * Basic storable types 
     Store8 (..),
 
@@ -61,21 +57,6 @@ fromChipAddress :: Num b => ChipAddress -> b
 fromChipAddress (ChipAddress addr) = fromIntegral addr
 
 
---------------------------------------------------------------------------------
---  registers addressing inside chips
---  our register addresses are always of size 1 byte 
-
--- | Register address
-newtype RegisterAddress = RegisterAddress Word8
-    deriving (Num, Storable)
-
-instance Show RegisterAddress where
-    show (RegisterAddress w) =
-        (if 0x10 <= w then "0x" else "0x0") <> fmap toUpper (showHex w "")
-
--- | Convert from 'RegisterAddress'
-fromRegisterAddress :: Num b => RegisterAddress -> b
-fromRegisterAddress (RegisterAddress addr) = fromIntegral addr
 
 
 --------------------------------------------------------------------------------
