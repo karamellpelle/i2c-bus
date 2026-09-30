@@ -1,7 +1,6 @@
 --------------------------------------------------------------------------------
 -- | 
 -- Module                  : I2C.Internal.Linux
--- Description             : Backend implementation (Linux)
 -- SPDX-License-Identifier : MIT
 -- Copyright               : karamellpelle@hotmail.com
 -- Maintainer              : karamellpelle@hotmail.com

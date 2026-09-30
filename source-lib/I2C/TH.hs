@@ -1,7 +1,6 @@
 --------------------------------------------------------------------------------
 -- | 
 -- Module                  : I2C.TH
--- Description             : Chips and registers utilities 
 -- SPDX-License-Identifier : MIT
 -- Copyright               : karamellpelle@hotmail.com
 -- Maintainer              : karamellpelle@hotmail.com

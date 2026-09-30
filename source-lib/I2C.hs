@@ -1,7 +1,6 @@
 --------------------------------------------------------------------------------
 -- | 
 -- Module                  : I2C
--- Description             : Main module
 -- SPDX-License-Identifier : MIT
 -- Copyright               : karamellpelle@hotmail.com
 -- Maintainer              : karamellpelle@hotmail.com
