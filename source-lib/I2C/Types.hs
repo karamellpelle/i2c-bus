@@ -12,17 +12,18 @@
 {-# LANGUAGE CPP #-}
 module I2C.Types
 (
-    -- * Basic storable types 
-    Store8 (..),
+    -- * Storable types 
+    --
+    -- $storableTypes
 
     -- ** Little endian
-    Store16LE (..),
-    Store32LE (..),
-    Store64LE (..),
+    Word16LE (..),
+    Word32LE (..),
+    Word64LE (..),
     -- ** Big endian
-    Store16BE (..),
-    Store32BE (..),
-    Store64BE (..),
+    Word16BE (..),
+    Word32BE (..),
+    Word64BE (..),
 
     -- * Other
     StorableAB (..),
@@ -43,13 +44,17 @@ import Data.Char (toUpper)
 --------------------------------------------------------------------------------
 --  Little and big endian Storable
 
-newtype Store8 = Store8 Word8 
-    deriving (Eq, Bits, Num, Integral, Enum, Real, Ord, Storable)
 
-newtype Store16LE = Store16LE Word16 
+-- $storableTypes
+--
+-- These Word variants overrides their 'Storable' instance so that they can
+-- be binary serialized as little endian or big endian. This is useful when
+-- communicating between host architecture and chip hardware.
+
+newtype Word16LE = Word16LE Word16 
     deriving (Eq, Bits, Num, Integral, Enum, Real, Ord)
 
-instance Storable Store16LE where
+instance Storable Word16LE where
     sizeOf w = sizeOf $ un @Word16 w
     alignment w = alignment $ un @Word16 w
 #ifdef ARCH_IS_BIG_ENDIAN
@@ -60,10 +65,10 @@ instance Storable Store16LE where
     poke = \ptr w -> poke (castPtr ptr) $ un @Word16 w
 #endif
 
-newtype Store32LE = Store32LE Word32
+newtype Word32LE = Word32LE Word32
     deriving (Eq, Bits, Num, Integral, Enum, Real, Ord)
 
-instance Storable Store32LE where
+instance Storable Word32LE where
     sizeOf w = sizeOf $ un @Word32 w
     alignment w = alignment $ un @Word32 w
 #ifdef ARCH_IS_BIG_ENDIAN
@@ -75,10 +80,10 @@ instance Storable Store32LE where
 #endif
 
 
-newtype Store64LE = Store64LE Word64
+newtype Word64LE = Word64LE Word64
     deriving (Eq, Bits, Num, Integral, Enum, Real, Ord)
 
-instance Storable Store64LE where
+instance Storable Word64LE where
     sizeOf w = sizeOf $ un @Word64 w
     alignment w = alignment $ un @Word64 w
 #ifdef ARCH_IS_BIG_ENDIAN
@@ -89,10 +94,10 @@ instance Storable Store64LE where
     poke = \ptr w -> poke (castPtr ptr) $ un @Word64 w
 #endif
 
-newtype Store16BE = Store16BE Word16
+newtype Word16BE = Word16BE Word16
     deriving (Eq, Bits, Num, Integral, Enum, Real, Ord)
 
-instance Storable Store16BE where
+instance Storable Word16BE where
     sizeOf w = sizeOf $ un @Word16 w
     alignment w = alignment $ un @Word16 w
 #ifdef ARCH_IS_LITTLE_ENDIAN
@@ -103,10 +108,10 @@ instance Storable Store16BE where
     poke = \ptr w -> poke (castPtr ptr) $ un @Word16 w
 #endif
 
-newtype Store32BE = Store32BE Word32
+newtype Word32BE = Word32BE Word32
     deriving (Eq, Bits, Num, Integral, Enum, Real, Ord)
 
-instance Storable Store32BE where
+instance Storable Word32BE where
     sizeOf w = sizeOf $ un @Word32 w
     alignment w = alignment $ un @Word32 w
 #ifdef ARCH_IS_LITTLE_ENDIAN
@@ -118,10 +123,10 @@ instance Storable Store32BE where
 #endif
 
 
-newtype Store64BE = Store64BE Word64
+newtype Word64BE = Word64BE Word64
     deriving (Eq, Bits, Num, Integral, Enum, Real, Ord)
 
-instance Storable Store64BE where
+instance Storable Word64BE where
     sizeOf w = sizeOf $ un @Word64 w
     alignment w = alignment $ un @Word64 w
 #ifdef ARCH_IS_LITTLE_ENDIAN

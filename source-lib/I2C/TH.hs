@@ -147,7 +147,7 @@ register tychip addr name ty = do
 -- > $(register8 ''MYCHIP 0x22 "MY8" 0x83)
 -- > ======>
 -- >   newtype MY8
--- >     = MY8 Store8
+-- >     = MY8 Word8
 -- >     deriving Storable
 -- >     deriving Eq
 -- >   instance Default MY8 where
@@ -162,38 +162,38 @@ register8 :: Name ->            -- ^ Chip this register belongs to
              Word8 ->           -- ^ Default value (if any)
              Q [Dec]
 register8 tychip addr name def =
-    registerN tychip addr name def ''Store8 'showRegT8Bin
+    registerN tychip addr name def ''Word8 'showRegT8Bin
     
 
 -- | Declare a register of Chip that contains Word16 data as Little Endian
 register16LE :: Name -> RegisterAddress -> String -> Word16 -> Q [Dec]
 register16LE tychip addr name def =
-    registerN tychip addr name def ''Store16LE 'showRegT16Hex
+    registerN tychip addr name def ''Word16LE 'showRegT16Hex
 
 -- | Declare a register of Chip that contains Word16 data as Big Endian
 register16BE :: Name -> RegisterAddress -> String -> Word16 -> Q [Dec]
 register16BE tychip addr name def =
-    registerN tychip addr name def ''Store16BE 'showRegT16Hex
+    registerN tychip addr name def ''Word16BE 'showRegT16Hex
 
 -- | Declare a register of Chip that contains Word32 data as Little Endian
 register32LE :: Name -> RegisterAddress -> String -> Word32 -> Q [Dec]
 register32LE tychip addr name def =
-    registerN tychip addr name def ''Store32LE 'showRegT32Hex
+    registerN tychip addr name def ''Word32LE 'showRegT32Hex
 
 -- | Declare a register of Chip that contains Word32 data as Big Endian
 register32BE :: Name -> RegisterAddress -> String -> Word32 -> Q [Dec]
 register32BE tychip addr name def =
-    registerN tychip addr name def ''Store32BE 'showRegT32Hex
+    registerN tychip addr name def ''Word32BE 'showRegT32Hex
 
 -- | Declare a register of Chip that contains Word64 data as Little Endian
 register64LE :: Name -> RegisterAddress -> String -> Word64 -> Q [Dec]
 register64LE tychip addr name def =
-    registerN tychip addr name def ''Store64LE 'showRegT64Hex
+    registerN tychip addr name def ''Word64LE 'showRegT64Hex
 
 -- | Declare a register of Chip that contains Word64 data as Big Endian
 register64BE :: Name -> RegisterAddress -> String -> Word64 -> Q [Dec]
 register64BE tychip addr name def =
-    registerN tychip addr name def ''Store64BE 'showRegT64Hex
+    registerN tychip addr name def ''Word64BE 'showRegT64Hex
 
 
 registerN :: Integral n => Name -> RegisterAddress -> String -> n -> Name -> Name -> Q [Dec]
@@ -237,25 +237,25 @@ setPrefixRegister pre = do
 -- > ======>
 -- >   getVALUES :: MYREG8 -> Word8
 -- >   getVALUES
--- >     = \w -> (fromIntegral $ (unsafeShiftR (un @Store8 w) 3 .&. 7))
+-- >     = \w -> (fromIntegral $ (unsafeShiftR (un @Word8 w) 3 .&. 7))
 -- >   setVALUES :: Word8 -> MYREG8 -> MYREG8
 -- >   setVALUES
--- >     = \ n -> (under @Store8 $ (\ w -> ((w .&. complement 56) .|. unsafeShiftL (7 .&. fromIntegral n) 3)))
+-- >     = \ n -> (under @Word8 $ (\ w -> ((w .&. complement 56) .|. unsafeShiftL (7 .&. fromIntegral n) 3)))
 -- >
 -- > $(field ''MYREG16 "ENABLE" "000*000000000000")
 -- > ======>
 -- >   getENABLE :: MYREG16 -> Word16
 -- >   getENABLE
--- >     = \w -> (fromIntegral $ (unsafeShiftR (un @Store16LE w) 12 .&. 1))
+-- >     = \w -> (fromIntegral $ (unsafeShiftR (un @Word16LE w) 12 .&. 1))
 -- >   setENABLE :: Word16 -> MYREG16 -> MYREG16
 -- >   setENABLE
--- >     = \ n -> (under @Store16LE $ (\ w -> ((w .&. complement 4096) .|. unsafeShiftL (1 .&. fromIntegral n) 12)))
+-- >     = \ n -> (under @Word16LE $ (\ w -> ((w .&. complement 4096) .|. unsafeShiftL (1 .&. fromIntegral n) 12)))
 -- >   bitsetENABLE :: MYREG16 -> MYREG16
--- >   bitsetENABLE = under @Store16LE (flip setBit 12)
+-- >   bitsetENABLE = under @Word16LE (flip setBit 12)
 -- >   bitclearENABLE :: MYREG16 -> MYREG16
--- >   bitclearENABLE = under @Store16LE (flip clearBit 12)
+-- >   bitclearENABLE = under @Word16LE (flip clearBit 12)
 -- >   bittoggleENABLE :: MYREG16 -> MYREG16
--- >   bittoggleENABLE = under @Store16LE (flip complementBit 12)
+-- >   bittoggleENABLE = under @Word16LE (flip complementBit 12)
 --
 field :: Name ->      -- ^ Which register the field is contained in
          String ->    -- ^ Name of field
