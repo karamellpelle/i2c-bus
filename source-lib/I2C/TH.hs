@@ -250,19 +250,19 @@ assertNameRegister name = case name of
 -- > ======>
 -- >   getVALUES :: MYREG8 -> Word8
 -- >   getVALUES
--- >     = \w -> (fromIntegral $ (unsafeShiftR (un @Word8 w) 3 .&. 7))
+-- >     = \w -> (un @Word8 $ (unsafeShiftR (un @Word8 w) 3 .&. 7))
 -- >   setVALUES :: Word8 -> MYREG8 -> MYREG8
 -- >   setVALUES
--- >     = \ n -> (under @Word8 $ (\ w -> ((w .&. complement 56) .|. unsafeShiftL (7 .&. fromIntegral n) 3)))
+-- >     = \n -> (under @Word8 $ (\w -> ((w .&. complement 56) .|. unsafeShiftL (7 .&. wrap @Word8 n) 3)))
 -- >
 -- > $(field ''MYREG16 "ENABLE" "000*000000000000")
 -- > ======>
 -- >   getENABLE :: MYREG16 -> Word16
 -- >   getENABLE
--- >     = \w -> (fromIntegral $ (unsafeShiftR (un @Word16LE w) 12 .&. 1))
+-- >     = \w -> (un @Word16 $ (unsafeShiftR (un @Word16LE w) 12 .&. 1))
 -- >   setENABLE :: Word16 -> MYREG16 -> MYREG16
 -- >   setENABLE
--- >     = \ n -> (under @Word16LE $ (\ w -> ((w .&. complement 4096) .|. unsafeShiftL (1 .&. fromIntegral n) 12)))
+-- >     = \n -> (under @Word16LE $ (\w -> ((w .&. complement 4096) .|. unsafeShiftL (1 .&. wrap @Word16LE n) 12)))
 -- >   bitsetENABLE :: MYREG16 -> MYREG16
 -- >   bitsetENABLE = under @Word16LE (flip setBit 12)
 -- >   bitclearENABLE :: MYREG16 -> MYREG16
@@ -281,7 +281,10 @@ field ty name bitstr = case bitstrToField bitstr of
         --runIO $ print info
   
         TyConI (NewtypeD _ _ty _ _ (NormalC tycon [(_, ConT tywrap)]) _)  <- reify ty
-        TyConI (NewtypeD _ _ty _ _ (NormalC tycon [(_, ConT tywrap')]) _)  <- reify tywrap
+        info <- reify tywrap
+        let tywrap' = case info of
+                TyConI (NewtypeD _ _ty _ _ (NormalC tycon [(_, ConT tywrap')]) _)   -> tywrap' -- if wrapped inside WordXXLE/WordXXBE
+                _                                                                   -> tywrap  -- if not wrapped, i.e. Word8
 
         assertCorrectSize size tywrap'
 
@@ -305,8 +308,7 @@ field ty name bitstr = case bitstrToField bitstr of
             w <- newName "w" 
 
             pure  [ SigD funname (AppT (AppT ArrowT (ConT ty)) (ConT tywrap'))
-                  , ValD (VarP funname) (NormalB (LamE [VarP w] (InfixE (Just (VarE 'fromIntegral)) (VarE '($)) (Just (InfixE (Just (AppE (AppE (VarE 'unsafeShiftR) 
-                  (AppE (AppTypeE (VarE 'un) (ConT tywrap)) (VarE w))) (LitE (IntegerL $ fromIntegral ix)))) (VarE '(.&.)) (Just maskE)))))) []
+                  , ValD (VarP funname) (NormalB (LamE [VarP w] (InfixE (Just (AppTypeE (VarE 'un) (ConT tywrap'))) (VarE '($)) (Just (InfixE (Just (AppE (AppE (VarE 'unsafeShiftR) (AppE (AppTypeE (VarE 'un) (ConT tywrap)) (VarE w))) (LitE (IntegerL $ fromIntegral ix)))) (VarE '(.&.)) (Just maskE)))))) []
                   ]
 
         decSet tywrap' tywrap ty tycon (size, ix, len) = do
@@ -318,7 +320,7 @@ field ty name bitstr = case bitstrToField bitstr of
             w <- newName "w" 
             
             pure  [ SigD funname (AppT (AppT ArrowT (ConT tywrap')) (AppT (AppT ArrowT (ConT ty)) (ConT ty)))
-                  , ValD (VarP funname) (NormalB (LamE [VarP n] (InfixE (Just (AppTypeE (VarE 'under) (ConT tywrap))) (VarE '($)) (Just (LamE [VarP w] (InfixE (Just (InfixE (Just (VarE w)) (VarE '(.&.)) (Just (AppE (VarE 'complement) (maskE0))))) (VarE '(.|.)) (Just (AppE (AppE (VarE 'unsafeShiftL) (InfixE (Just maskE1) (VarE '(.&.)) (Just (AppE (VarE 'fromIntegral) (VarE n))))) ixE)))))))) []
+                  , ValD (VarP funname) (NormalB (LamE [VarP n] (InfixE (Just (AppTypeE (VarE 'under) (ConT tywrap))) (VarE '($)) (Just (LamE [VarP w] (InfixE (Just (InfixE (Just (VarE w)) (VarE '(.&.)) (Just (AppE (VarE 'complement) (maskE0))))) (VarE '(.|.)) (Just (AppE (AppE (VarE 'unsafeShiftL) (InfixE (Just maskE1) (VarE '(.&.)) (Just (AppE (AppTypeE (VarE 'wrap) (ConT tywrap)) (VarE n))))) ixE)))))))) []
                   ]
 
         decBit tywrap ty (size, ix, len) = do

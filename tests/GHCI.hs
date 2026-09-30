@@ -9,7 +9,6 @@ import Relude.Extra.Newtype
 import I2C
 import I2C.Register
 import I2C.Raw
-import I2C.Internal as Internal
 import Data.Default
 import Text.Show qualified
 import Numeric
