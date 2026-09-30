@@ -92,11 +92,11 @@ closeChip busdev@(BusDevice _id _addr ptr) = do
 
 -- | Set timeout for transfers.
 --   May throw 'I2CErr'.
-chipTimeoutMs :: forall chip . (Chip chip) => 
+chipTimeoutMs :: forall chip m . (Chip chip, MonadIO m) => 
                  BusDevice chip ->                -- ^ BusDevice
                  Word ->                          -- ^ Time in milliseconds
-                 IO ()
-chipTimeoutMs busdev@(BusDevice _id _addr ptr) ms = do
+                 m ()
+chipTimeoutMs busdev@(BusDevice _id _addr ptr) ms = liftIO $ do
     assertOK' tagErr $ c_ioctl (ptrI2C_ClientToFd ptr) c_I2C_TIMEOUT $ fromIntegral $ div ms 10
     pure ()
     where
