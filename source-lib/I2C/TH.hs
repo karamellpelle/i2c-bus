@@ -34,7 +34,8 @@ module I2C.TH
     --
     setDefaults,
     setPrefixRegister,
-
+    setShowBinary,
+    setShowHex,
 
 ) where
 
@@ -71,12 +72,13 @@ import Language.Haskell.TH.Lib
 
 data QSetting = QSetting {
                 qsettingPrefixRegister :: String 
-              --, qsettingShowHex :: Bool
+              , qsettingShowVariant :: ShowVariant
               }
 
 instance Default QSetting where
     def = QSetting {
           qsettingPrefixRegister = "reg"
+        , qsettingShowVariant = ShowHex
         }
 
 
@@ -104,6 +106,43 @@ setPrefixRegister pre = do
 
             when (not $ isAsciiLower c) $ fail "Register prefixes must at start with lowercase [a-z]"
             when (not $ all (\c -> isAlphaNum c || c == '_' || c == '\'') name) $ fail "Register prefixes must only contain alphanums, '_' or '\\''"
+
+data ShowVariant = ShowBin
+                 | ShowHex
+
+-- | Implement instance Show as binary string
+--
+--   Example: 
+--
+--   >>> show my8
+--   >>> "MY8(00000110)"
+--
+setShowBinary :: Q [Dec]
+setShowBinary = do
+    getQ >>= \case 
+        Nothing  -> putQ $ def { qsettingShowVariant = ShowBin }
+        Just set -> putQ $ set { qsettingShowVariant = ShowBin }
+    pure mempty
+
+-- | Implement instance Show as hex string.
+--
+--   Example: 
+--
+--   >>> show my16 
+--   >>> "MY16(0F18)"
+--
+setShowHex :: Q [Dec]
+setShowHex = do
+    getQ >>= \case 
+        Nothing  -> putQ $ def { qsettingShowVariant = ShowHex }
+        Just set -> putQ $ set { qsettingShowVariant = ShowHex }
+    pure mempty 
+
+getShowVariant :: Q ShowVariant
+getShowVariant = 
+   getQ >>= \case 
+       Nothing  -> pure $ qsettingShowVariant def
+       Just set -> pure $ qsettingShowVariant set
 
 --------------------------------------------------------------------------------
 --  Chip
@@ -181,39 +220,60 @@ register8 :: Name ->            -- ^ Chip this register belongs to
              String ->          -- ^ Register name                 
              Word8 ->           -- ^ Default value (if any)
              Q [Dec]
-register8 tychip addr name def =
-    registerN tychip addr name def ''Word8 'showRegT8Bin
-    
+register8 tychip addr name def = do
+    showv <- getShowVariant
+    registerN tychip addr name def ''Word8 $ case showv of
+        ShowHex -> 'showRegT8Hex
+        ShowBin -> 'showRegT8Bin
+ 
 
 -- | Declare a register of Chip with custom type wrapping Word16 as Little Endian.
 register16LE :: Name -> RegisterAddress -> String -> Word16 -> Q [Dec]
-register16LE tychip addr name def =
-    registerN tychip addr name def ''Word16LE 'showRegT16Hex
+register16LE tychip addr name def = do
+    showv <- getShowVariant
+    registerN tychip addr name def ''Word16LE $ case showv of
+        ShowHex -> 'showRegT16Hex
+        ShowBin -> 'showRegT16Bin
 
 -- | Declare a register of Chip with custom type wrapping Word16 as Big Endian
 register16BE :: Name -> RegisterAddress -> String -> Word16 -> Q [Dec]
-register16BE tychip addr name def =
-    registerN tychip addr name def ''Word16BE 'showRegT16Hex
+register16BE tychip addr name def = do
+    showv <- getShowVariant
+    registerN tychip addr name def ''Word16BE $ case showv of
+        ShowHex -> 'showRegT16Hex
+        ShowBin -> 'showRegT16Bin
 
 -- | Declare a register of Chip with custom type wrapping Word32 as Little Endian
 register32LE :: Name -> RegisterAddress -> String -> Word32 -> Q [Dec]
-register32LE tychip addr name def =
-    registerN tychip addr name def ''Word32LE 'showRegT32Hex
+register32LE tychip addr name def = do
+    showv <- getShowVariant
+    registerN tychip addr name def ''Word32LE $ case showv of
+        ShowHex -> 'showRegT32Hex
+        ShowBin -> 'showRegT32Bin
 
 -- | Declare a register of Chip with custom type wrapping Word32 as Big Endian
 register32BE :: Name -> RegisterAddress -> String -> Word32 -> Q [Dec]
-register32BE tychip addr name def =
-    registerN tychip addr name def ''Word32BE 'showRegT32Hex
+register32BE tychip addr name def = do
+    showv <- getShowVariant
+    registerN tychip addr name def ''Word32BE $ case showv of
+        ShowHex -> 'showRegT32Hex
+        ShowBin -> 'showRegT32Bin
 
 -- | Declare a register of Chip with custom type wrapping Word64 as Little Endian
 register64LE :: Name -> RegisterAddress -> String -> Word64 -> Q [Dec]
-register64LE tychip addr name def =
-    registerN tychip addr name def ''Word64LE 'showRegT64Hex
+register64LE tychip addr name def = do
+    showv <- getShowVariant
+    registerN tychip addr name def ''Word64LE $ case showv of
+        ShowHex -> 'showRegT64Hex
+        ShowBin -> 'showRegT64Bin
 
 -- | Declare a register of Chip with custom type wrapping Word64 as Big Endian
 register64BE :: Name -> RegisterAddress -> String -> Word64 -> Q [Dec]
-register64BE tychip addr name def =
-    registerN tychip addr name def ''Word64BE 'showRegT64Hex
+register64BE tychip addr name def = do
+    showv <- getShowVariant
+    registerN tychip addr name def ''Word64BE $ case showv of
+        ShowHex -> 'showRegT64Hex
+        ShowBin -> 'showRegT64Bin
 
 
 registerN :: Integral n => Name -> RegisterAddress -> String -> n -> Name -> Name -> Q [Dec]

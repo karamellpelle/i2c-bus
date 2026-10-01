@@ -43,19 +43,28 @@ import Data.Storable.Endian
 
 $(chip "MYCHIP")
 
+$(setShowBinary)
 $(register8 ''MYCHIP 0x22 "MY8" 0x83)
 $(field ''MY8   "A_FIELD"  "0000***0")
 $(field ''MY8   "A_BIT"    "00*00000")
 
+-- 'MY64' types will be shown as a 64 character binary string
+-- because of the imperative call '$(setShowBinary)' above.
+$(register64BE ''MYCHIP 0x22 "MY64" 0x83)
+
+$(setShowHex)
 $(register16LE ''MYCHIP 0x44 "MY16" 0x1122)
 $(field ''MY16  "B_FIELD"  "00000000000****0")
 $(field ''MY16  "B_BIT"    "00*0000000000000")
 
-a :: MY8
-a = MY8 0b00000110
+my8 :: MY8
+my8 = MY8 0b00000110
 
-b :: MY16
-b = MY16 0b0000111100011000
+my16 :: MY16
+my16 = MY16 0b0000111100011000
+
+my64 :: MY64
+my64 = MY64 0x0123456789ABCDEF 
 
 
 --------------------------------------------------------------------------------

@@ -6,7 +6,7 @@
 -- Maintainer              : karamellpelle@hotmail.com
 -- Stability               : experimental
 --
--- Utilities for working with registers in chips
+-- Utilities for working with chips with registers.
 --------------------------------------------------------------------------------
 module I2C.Register
 (
@@ -44,7 +44,7 @@ import I2C.Types
 --  Register
 
 -- | Register addressing inside chips.
---   Register addresses are always of size 1 byte.
+--   Register addresses are of size 1 byte (256 possible registers)
 newtype RegisterAddress = RegisterAddress Word8
     deriving (Num, Storable)
 
@@ -56,7 +56,7 @@ instance Show RegisterAddress where
 fromRegisterAddress :: Num b => RegisterAddress -> b
 fromRegisterAddress (RegisterAddress addr) = fromIntegral addr
 
--- | Index into register of type 't' of a chip of type 'chip'
+-- | Index to a register of type 't'.
 data Register chip t = Register Text RegisterAddress
 
 

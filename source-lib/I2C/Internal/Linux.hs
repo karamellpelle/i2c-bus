@@ -25,6 +25,8 @@ module I2C.Internal.Linux
 
     -- * Extra functionality on Linux 
     chipTimeoutMs,
+    
+    --I2C_Client,
 
 ) where
 
@@ -249,7 +251,7 @@ assertOK' str ma = do
 --    * ioctl(file, I2C_TIMEOUT, unsigned long *funcs): timeout in 10 ms
 --    
 
--- | linux communication
+-- | Data type for the Linux C API for I2C
 data I2C_Client
 
 -- |  > /* Use this slave address, even if it is already in use by a driver! */
