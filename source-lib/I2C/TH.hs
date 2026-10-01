@@ -13,7 +13,6 @@ module I2C.TH
 (
     -- * Create Chips
     chip,
-    --instanceChip,
 
     -- * Create Registers
     register,
@@ -30,7 +29,7 @@ module I2C.TH
     -- * Create fields
     field,
 
-    -- * Imperative TH settings
+    -- * Imperative settings
     -- $settings
     --
     setDefaults,
@@ -65,7 +64,7 @@ import Language.Haskell.TH.Lib
 
 -- $settings
 --
--- Settings that control how code is generated. A new setting only applies to 
+-- Settings that control code generation. A new setting only applies to 
 -- the TH calls that follows, hence you can have different settings for different
 -- calls.
 -- 
@@ -80,11 +79,31 @@ instance Default QSetting where
           qsettingPrefixRegister = "reg"
         }
 
+
 -- | Restore to default settings
 setDefaults :: String -> Q [Dec]
 setDefaults pre = do
     putQ @QSetting def 
     pure []
+
+-- | Set prefix for declared Register values. Default prefix is @reg@.
+setPrefixRegister :: String -> Q [Dec]
+setPrefixRegister pre = do
+    assertNamePrefix pre
+    getQ >>= \case 
+        Nothing  -> putQ $ def { qsettingPrefixRegister = pre }
+        Just set -> putQ $ set { qsettingPrefixRegister = pre }
+
+    pure mempty
+    where
+      assertNamePrefix name = case name of
+        ""      -> fail "Register prefixes must be non-empty"
+        (c:cs)  -> do
+            -- first make sure we restrict characters to ASCII
+            when (not $ all isAscii name) $ fail "Invalid characters in register prefix (non-ASCII)"
+
+            when (not $ isAsciiLower c) $ fail "Register prefixes must at start with lowercase [a-z]"
+            when (not $ all (\c -> isAlphaNum c || c == '_' || c == '\'') name) $ fail "Register prefixes must only contain alphanums, '_' or '\\''"
 
 --------------------------------------------------------------------------------
 --  Chip
@@ -121,8 +140,9 @@ instanceChip ty = do
 --  Register
 
 
--- | Declare a 'Register' of a chip from 'Storable'.
---   Storable is relative to the chip's hardware
+-- | Declare a 'Register' of a chip. 
+--   The data type of the register has to implement 'Storable',
+--   and this implemetation is relative to the chip's hardware.
 --
 -- > $(register ''MPU6050 0x41 "TEMP_OUT" ''TemperatureC)
 -- > ======>
@@ -130,9 +150,9 @@ instanceChip ty = do
 -- >   regTEMP_OUT = Register "TEMP_OUT" 65
 --
 register :: Name ->             -- ^ Chip this register belongs to
-            RegisterAddress ->  -- ^ Register address on chip
+            RegisterAddress ->  -- ^ Register address
             String ->           -- ^ Register name
-            Name ->             -- ^ Contained data type. Must be an instance of 'Storable'.
+            Name ->             -- ^ Type of data in this register. Must be an instance of 'Storable'.
             Q [Dec]
 register tychip addr name ty = do
     assertNameRegister name
@@ -142,7 +162,7 @@ register tychip addr name ty = do
           ]
 
 
--- | Declare a register of Chip that contains Word8 data
+-- | Declare a register of Chip with custom type wrapping Word8 data.
 --
 -- > $(register8 ''MYCHIP 0x22 "MY8" 0x83)
 -- > ======>
@@ -165,32 +185,32 @@ register8 tychip addr name def =
     registerN tychip addr name def ''Word8 'showRegT8Bin
     
 
--- | Declare a register of Chip that contains Word16 data as Little Endian
+-- | Declare a register of Chip with custom type wrapping Word16 as Little Endian.
 register16LE :: Name -> RegisterAddress -> String -> Word16 -> Q [Dec]
 register16LE tychip addr name def =
     registerN tychip addr name def ''Word16LE 'showRegT16Hex
 
--- | Declare a register of Chip that contains Word16 data as Big Endian
+-- | Declare a register of Chip with custom type wrapping Word16 as Big Endian
 register16BE :: Name -> RegisterAddress -> String -> Word16 -> Q [Dec]
 register16BE tychip addr name def =
     registerN tychip addr name def ''Word16BE 'showRegT16Hex
 
--- | Declare a register of Chip that contains Word32 data as Little Endian
+-- | Declare a register of Chip with custom type wrapping Word32 as Little Endian
 register32LE :: Name -> RegisterAddress -> String -> Word32 -> Q [Dec]
 register32LE tychip addr name def =
     registerN tychip addr name def ''Word32LE 'showRegT32Hex
 
--- | Declare a register of Chip that contains Word32 data as Big Endian
+-- | Declare a register of Chip with custom type wrapping Word32 as Big Endian
 register32BE :: Name -> RegisterAddress -> String -> Word32 -> Q [Dec]
 register32BE tychip addr name def =
     registerN tychip addr name def ''Word32BE 'showRegT32Hex
 
--- | Declare a register of Chip that contains Word64 data as Little Endian
+-- | Declare a register of Chip with custom type wrapping Word64 as Little Endian
 register64LE :: Name -> RegisterAddress -> String -> Word64 -> Q [Dec]
 register64LE tychip addr name def =
     registerN tychip addr name def ''Word64LE 'showRegT64Hex
 
--- | Declare a register of Chip that contains Word64 data as Big Endian
+-- | Declare a register of Chip with custom type wrapping Word64 as Big Endian
 register64BE :: Name -> RegisterAddress -> String -> Word64 -> Q [Dec]
 register64BE tychip addr name def =
     registerN tychip addr name def ''Word64BE 'showRegT64Hex
@@ -207,22 +227,6 @@ registerN tychip addr name def tywrap showf = do
     pure $ [dNewtype, dInstanceDefault, dInstanceShow] <> dRegister
 
 
--- | Set prefix for declared Register values. Default prefix is @reg@.
-setPrefixRegister :: String -> Q [Dec]
-setPrefixRegister pre = do
-    assertValid pre
-    getQ >>= \case 
-        Nothing  -> putQ $ def { qsettingPrefixRegister = pre }
-        Just set -> putQ $ set { qsettingPrefixRegister = pre }
-
-    pure mempty
-    where
-      assertValid = \case 
-        ""      -> fail "Sorry, registers must have a non-empty prefix"
-        (c:cs)  -> do
-            when (not $ isAlpha c && isLower c) $ fail "Sorry, registers must at least start with lowercase ASCII"
-            pure () 
-
 -- | see 2.4 Identifiers and Operators: https://www.haskell.org/onlinereport/lexemes.html
 assertNameRegister :: String -> Q ()
 assertNameRegister name = case name of
@@ -231,13 +235,13 @@ assertNameRegister name = case name of
         -- first make sure we restrict characters to ASCII
         when (not $ all isAscii name) $ fail "Invalid characters in Register name (non-ASCII)"
 
-        when (not $ isAsciiUpper c) $ fail "Register names must start with [A-Z]"
-        when (not $ all (\c -> isAlphaNum c || c == '_' || c == '\'') cs) $ fail "Register names must only contain alphanums, '_' or '\\''"
+        when (not $ isAsciiUpper c) $ fail "Register names must start with uppercase [A-Z]"
+        when (not $ all (\c -> isAlphaNum c || c == '_' || c == '\'') name) $ fail "Register names must only contain alphanums, '_' or '\\''"
 
 --------------------------------------------------------------------------------
 --  fields
 
--- | Define a data type inside a register. The subset is defined by a string 
+-- | Define a data type inside a register type. The subset is defined by a string 
 -- having the same length as the bitsize of the register, wherein the  @*@ characters
 -- defines the field (other characters are considered placeholders).
 --
@@ -269,7 +273,7 @@ assertNameRegister name = case name of
 -- >   bittoggleENABLE :: MYREG16 -> MYREG16
 -- >   bittoggleENABLE = under @Word16LE (flip complementBit 12)
 --
-field :: Name ->      -- ^ Which register the field is contained in
+field :: Name ->      -- ^ Which register type the field is contained in
          String ->    -- ^ Name of field
          String ->    -- ^ String that defines the field.
          Q [Dec]

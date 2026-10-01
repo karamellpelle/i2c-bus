@@ -154,7 +154,7 @@ read busdev@(BusDevice _id addr ptr) sizeW pokeW sizeR peekR = do
         withMem = if size <= maxAllocaBytes then allocaBytes else mallocBytes'
 
     res <- try @IOException $ withMem size $ \mem -> do
-        -- set write data. this data will be overwritten after reading
+        -- set write data. this data will be overwritten when reading
         pokeW $ castPtr mem
         assertOK' (tagErr busdev) $ c_i2c_read ptr (fromChipAddress addr) mem (fI sizeW) mem (fI sizeR)
         peekR $ castPtr mem

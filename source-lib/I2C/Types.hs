@@ -6,7 +6,6 @@
 -- Maintainer              : karamellpelle@hotmail.com
 -- Stability               : experimental
 --
--- Primitive types.
 --------------------------------------------------------------------------------
 {-# LANGUAGE CPP #-}
 module I2C.Types
