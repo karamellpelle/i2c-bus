@@ -5,7 +5,7 @@ spec-version: 0.36.0
 name:
     i2c-bus
 version:
-    0.4
+    0.5
 github:
     karamellpelle/i2c-bus
 homepage:
