@@ -33,7 +33,7 @@ synopsis:
     Typed I2C communication 
 
 description: |
-    Library for I2C communication with utility modules for working with 
+    Library for typed I2C communication. Utilities for working with 
     registers.
 
 language: GHC2024 

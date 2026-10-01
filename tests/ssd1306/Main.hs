@@ -47,7 +47,7 @@ main = do
     ssd <- openSSD1306 "/dev/i2c-1"
     ssd1306Init ssd
 
-    display ssd =<< loadGIF "tests/ssd1306/image-128x32.gif"
+    display ssd =<< loadGIF "tests/ssd1306/haskell-128x32.gif"
     
     where
       display ssd frames = display' ssd frames frames
