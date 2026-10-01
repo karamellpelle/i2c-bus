@@ -8,6 +8,7 @@
 -- Portability             : Linux
 --------------------------------------------------------------------------------
 {-# LANGUAGE ForeignFunctionInterface #-}
+{-# OPTIONS_GHC -Wno-redundant-constraints #-}
 module I2C.Internal.Linux
 (
     -- * Implementation of the backend API
