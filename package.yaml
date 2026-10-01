@@ -1,7 +1,5 @@
 ---
 
-spec-version: 0.36.0
-
 name:
     i2c-bus
 version:
@@ -26,6 +24,7 @@ category:
     - i2c
     - raspberrypi
     #- eeprom
+    #- smbus
 extra-source-files:
     - README.md
     - CHANGELOG.md
@@ -34,7 +33,8 @@ synopsis:
     Typed I2C communication 
 
 description: |
-    Typed I2C communication 
+    Library for I2C communication with utility modules for working with 
+    registers.
 
 language: GHC2024 
 
@@ -67,10 +67,10 @@ ghc-options:
     - -Wno-unused-matches
     - -Wno-unused-imports
 
-# these may be overridden below:
+# these may be overridden below
 cpp-options:
-  - -DARCH_IS_UNKNOWN 
-  - -DINTERNAL_USE_EMPTY
+    - -DARCH_IS_UNKNOWN 
+    - -DINTERNAL_USE_EMPTY
 
 default-extensions:
     - NoImplicitPrelude

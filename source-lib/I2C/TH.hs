@@ -82,7 +82,7 @@ instance Default QSetting where
         }
 
 
--- | Restore to default settings
+-- | Restore to default settings.
 setDefaults :: String -> Q [Dec]
 setDefaults pre = do
     putQ @QSetting def 
@@ -110,7 +110,7 @@ setPrefixRegister pre = do
 data ShowVariant = ShowBin
                  | ShowHex
 
--- | Implement instance Show as binary string
+-- | Implement instance Show as binary string.
 --
 --   Example: 
 --
@@ -147,7 +147,7 @@ getShowVariant =
 --------------------------------------------------------------------------------
 --  Chip
 
--- | Declare a 'Chip' from name
+-- | Declare a 'Chip' from name.
 --
 -- > $(chip "MYCHIP")
 -- > ======>
@@ -212,7 +212,7 @@ register tychip addr name ty = do
 -- >   instance Default MY8 where
 -- >     def = MY8 131
 -- >   instance Show MY8 where
--- >     Text.Show.show = I2C.TH.showRegT8Bin "MY8"
+-- >     Text.Show.show = I2C.TH.showRegT8Hex "MY8"
 -- >   regMY8 :: Register MYCHIP MY8
 -- >   regMY8 = Register "MY8" 34
 register8 :: Name ->            -- ^ Chip this register belongs to
@@ -335,7 +335,7 @@ assertNameRegister name = case name of
 --
 field :: Name ->      -- ^ Which register type the field is contained in
          String ->    -- ^ Name of field
-         String ->    -- ^ String that defines the field.
+         String ->    -- ^ String that defines the field
          Q [Dec]
 field ty name bitstr = case bitstrToField bitstr of
     Left err              -> fail err
