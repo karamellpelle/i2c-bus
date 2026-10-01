@@ -112,21 +112,6 @@ when:
   #  cpp-options: -UARCH_IS_UNKNOWN -DARCH_IS_BIG_ENDIAN
 
 tests:
-    empty:
-        source-dirs: tests/empty/
-        main:        Main.hs
-        ghc-options:
-            - -threaded
-            - -rtsopts
-            - -with-rtsopts "-N -T"
-            - -Wno-unused-packages
-        dependencies:
-            - i2c-bus
-            #- hedgehog
-            #- tasty
-            #- tasty-hedgehog
-            #- tasty-hunit
-
     ssd1306:
         # to load this project in ghci: `stack ghci --test i2c-bus:test:ssd1306`
         # you may need to do `stack build` once before
@@ -140,3 +125,4 @@ tests:
             - i2c-bus
             - JuicyPixels
 
+    # also see tests/GHCI.hs
