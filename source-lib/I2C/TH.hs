@@ -312,20 +312,16 @@ assertNameRegister name = case name of
 -- > $(field ''MYREG8 "VALUES" "00***000")
 -- > ======>
 -- >   getVALUES :: MYREG8 -> Word8
--- >   getVALUES
--- >     = \w -> (un @Word8 $ (unsafeShiftR (un @Word8 w) 3 .&. 7))
+-- >   getVALUES = \w -> (un @Word8 $ (unsafeShiftR (un @Word8 w) 3 .&. 7))
 -- >   setVALUES :: Word8 -> MYREG8 -> MYREG8
--- >   setVALUES
--- >     = \n -> (under @Word8 $ (\w -> ((w .&. complement 56) .|. unsafeShiftL (7 .&. wrap @Word8 n) 3)))
+-- >   setVALUES = \n -> (under @Word8 $ (\w -> ((w .&. complement 56) .|. unsafeShiftL (7 .&. wrap @Word8 n) 3)))
 -- >
 -- > $(field ''MYREG16 "ENABLE" "000*000000000000")
 -- > ======>
 -- >   getENABLE :: MYREG16 -> Word16
--- >   getENABLE
--- >     = \w -> (un @Word16 $ (unsafeShiftR (un @Word16LE w) 12 .&. 1))
+-- >   getENABLE = \w -> (un @Word16 $ (unsafeShiftR (un @Word16LE w) 12 .&. 1))
 -- >   setENABLE :: Word16 -> MYREG16 -> MYREG16
--- >   setENABLE
--- >     = \n -> (under @Word16LE $ (\w -> ((w .&. complement 4096) .|. unsafeShiftL (1 .&. wrap @Word16LE n) 12)))
+-- >   setENABLE = \n -> (under @Word16LE $ (\w -> ((w .&. complement 4096) .|. unsafeShiftL (1 .&. wrap @Word16LE n) 12)))
 -- >   bitsetENABLE :: MYREG16 -> MYREG16
 -- >   bitsetENABLE = under @Word16LE (flip setBit 12)
 -- >   bitclearENABLE :: MYREG16 -> MYREG16
@@ -335,7 +331,7 @@ assertNameRegister name = case name of
 --
 field :: Name ->      -- ^ Which register type the field is contained in
          String ->    -- ^ Name of field
-         String ->    -- ^ String that defines the field
+         String ->    -- ^ Character string that defines the field
          Q [Dec]
 field ty name bitstr = case bitstrToField bitstr of
     Left err              -> fail err
