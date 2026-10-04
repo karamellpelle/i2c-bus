@@ -64,21 +64,21 @@ data Register chip t = Register Text RegisterAddress
 --  using Register
 
 -- | Read register.
---   May throw 'I2CErr'.
+--   May throw 'I2C.Exception.I2CErr'.
 regread :: (Chip chip, Storable a, MonadIO m) => Internal.BusDevice chip -> Register chip a -> m a
 regread busdev (Register _name addr) = 
     regread' busdev addr
 {-# INLINE regread #-}
 
 -- | Write register.
---   May throw 'I2CErr'.
+--   May throw 'I2C.Exception.I2CErr'.
 regwrite :: (Chip chip, Storable a, MonadIO m) => Internal.BusDevice chip -> Register chip a -> a -> m ()
 regwrite busdev (Register _name addr) = 
     regwrite' busdev addr
 {-# INLINE regwrite #-}
 
 -- | Modify register.
---   May throw 'I2CErr'.
+--   May throw 'I2C.Exception.I2CErr'.
 regmodify :: (Chip chip, Storable a, MonadIO m) => Internal.BusDevice chip -> Register chip a -> (a -> a) -> m a
 regmodify = \busdev reg f -> do
     a <- regread busdev reg
@@ -91,14 +91,14 @@ regmodify = \busdev reg f -> do
 --  raw addressing, no Register
 
 -- | Read register at address.
---   May throw 'I2CErr'.
+--   May throw 'I2C.Exception.I2CErr'.
 regread' :: forall a chip m . (Chip chip, Storable a, MonadIO m) => Internal.BusDevice chip -> RegisterAddress -> m a
 regread' busdev addr = 
     liftIO $ Internal.read busdev (sizeOf addr) (flip poke addr) (sizeOf @a undefined) peek
 {-# INLINE regread' #-}
 
 -- | Write register at address.
---   May throw 'I2CErr'.
+--   May throw 'I2C.Exception.I2CErr'.
 regwrite' :: forall a chip m . (Chip chip, Storable a, MonadIO m) => Internal.BusDevice chip -> RegisterAddress -> a -> m ()
 regwrite' busdev addr = \a -> do
     let w = StorableAB addr a
@@ -106,7 +106,7 @@ regwrite' busdev addr = \a -> do
 {-# INLINE regwrite' #-}
 
 -- | Modify register at address.
---   May throw 'I2CErr'.
+--   May throw 'I2C.Exception.I2CErr'.
 regmodify' :: forall a chip m . (Chip chip, Storable a, MonadIO m) => Internal.BusDevice chip -> RegisterAddress -> (a -> a) -> m a
 regmodify' = \busdev addr f -> do
     a <- regread' busdev addr

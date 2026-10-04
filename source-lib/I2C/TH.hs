@@ -115,7 +115,7 @@ data ShowVariant = ShowBin
 --   Example: 
 --
 --   >>> show my8
---   >>> "MY8(00000110)"
+--   "MY8(00000110)"
 --
 setShowBinary :: Q [Dec]
 setShowBinary = do
@@ -129,7 +129,7 @@ setShowBinary = do
 --   Example: 
 --
 --   >>> show my16 
---   >>> "MY16(0F18)"
+--   "MY16(0F18)"
 --
 setShowHex :: Q [Dec]
 setShowHex = do
