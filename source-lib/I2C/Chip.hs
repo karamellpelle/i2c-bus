@@ -9,7 +9,7 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 module I2C.Chip
 (
-    -- * Chip
+    -- * IsChip
     IsChip (..),
     -- ** Chip addressing
     ChipAddress (..),
@@ -27,7 +27,7 @@ import Data.Char (toUpper)
 --------------------------------------------------------------------------------
 --  chip
 
--- | Typeclass for I2C chips
+-- | Typeclass describing I2C chips
 class IsChip t where
     {-# MINIMAL chipName #-}
     -- | Human readable name

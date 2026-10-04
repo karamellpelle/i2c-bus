@@ -46,10 +46,10 @@ language: GHC2024
 #      manual: true 
 
 dependencies:
-    - base
-    - relude            >= 1.2
-    - data-default      >= 0.8
-    - template-haskell  >= 2.22
+    - base              >= 4.20 && < 4.23
+    - relude            >= 1.2  && < 1.3
+    - data-default      >= 0.8  && < 0.9
+    - template-haskell  >= 2.22 && < 2.25
 
 ghc-options:
     - -Wall
@@ -93,7 +93,7 @@ library:
         exposed-modules:
           - I2C.Internal.Linux
         dependencies: 
-          - unix
+          - unix      >= 2.8 && < 2.9
         c-sources: 
           - cbits/foreign.c
         include-dirs: 
