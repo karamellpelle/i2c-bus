@@ -28,6 +28,7 @@ category:
 extra-source-files:
     - README.md
     - CHANGELOG.md
+    - cbits/foreign.h
 
 synopsis:
     Typed I2C communication 
