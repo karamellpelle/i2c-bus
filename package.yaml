@@ -3,7 +3,7 @@
 name:
     i2c-bus
 version:
-    0.5
+    0.0.5
 github:
     karamellpelle/i2c-bus
 homepage:
@@ -47,9 +47,9 @@ language: GHC2024
 
 dependencies:
     - base
-    - relude
-    - data-default
-    - template-haskell 
+    - relude            >= 1.2
+    - data-default      >= 0.8
+    - template-haskell  >= 2.22
 
 ghc-options:
     - -Wall
@@ -67,7 +67,7 @@ ghc-options:
     - -Wno-unused-matches
     - -Wno-unused-imports
 
-# these may be overridden below
+# these are to be overridden below
 cpp-options:
     - -DARCH_IS_UNKNOWN 
     - -DINTERNAL_USE_EMPTY
