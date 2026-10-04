@@ -149,7 +149,7 @@ fromDynamicImage = ImageOLED . convertRGB8
 --  hardware
 
 data SSD1306  = SSD1306 {
-                ssd1306_BusDevice :: BusDevice SSD1306
+                ssd1306_Chip :: Chip SSD1306
               , ssd1306_Width :: Word
               , ssd1306_Height :: Word
               , ssd1306_VccExternal :: Bool
@@ -173,10 +173,10 @@ openSSD1306 busid = do
         height = 32
         vccExternal = False
 
-    busdev <- openChip "/dev/i2c-1" address
+    chip <- openChip "/dev/i2c-1" address
    
     pure $ SSD1306 {
-            ssd1306_BusDevice = busdev
+            ssd1306_Chip = chip
           , ssd1306_Width = width
           , ssd1306_Height = height
           , ssd1306_VccExternal = vccExternal
@@ -189,23 +189,23 @@ openSSD1306 busid = do
 ssd1306Init :: SSD1306 -> IO ()
 ssd1306Init ssd = do
     
-    let busdev = ssd1306_BusDevice ssd
+    let chip = ssd1306_Chip ssd
         width = ssd1306_Width ssd
         height = ssd1306_Height ssd
         vccExternal = ssd1306_VccExternal ssd
 
-    regwrite busdev regCOMMAND $ DisplayOff
+    regwrite chip regCOMMAND $ DisplayOff
 
-    regwrite busdev regCOMMAND $ DriveClockDiv 0x80
+    regwrite chip regCOMMAND $ DriveClockDiv 0x80
 
-    regwrite busdev regCOMMAND $ MapMultiplex $ fromIntegral $ height - 1
+    regwrite chip regCOMMAND $ MapMultiplex $ fromIntegral $ height - 1
     -- ^ does this overwrite previous image data? if so, try to set to max (63)
 
-    regwrite busdev regCOMMAND $ MapOffset 0
+    regwrite chip regCOMMAND $ MapOffset 0
 
-    regwrite busdev regCOMMAND $ MapStartline 0
+    regwrite chip regCOMMAND $ MapStartline 0
 
-    regwrite busdev regCOMMAND $ DriveChargePump $ if vccExternal then 0x10 else 0x14
+    regwrite chip regCOMMAND $ DriveChargePump $ if vccExternal then 0x10 else 0x14
 
     -- memory mode 
     -- * 0b00: Horizontal: 
@@ -215,49 +215,49 @@ ssd1306Init ssd = do
     --    i.e. write a 8 pixel colum for each given byte, and jump down to next 
     --    row of 8 pixels columns and restart, when the columns defined by 'RAMColumn'
     --    are filled. 
-    regwrite busdev regCOMMAND $ RAMMode 0b00 
+    regwrite chip regCOMMAND $ RAMMode 0b00 
 
-    regwrite busdev regCOMMAND $ MapSeg True
-    regwrite busdev regCOMMAND $ MapCom True
+    regwrite chip regCOMMAND $ MapSeg True
+    regwrite chip regCOMMAND $ MapCom True
 
     let (alt, enable, contrast) | width == 128 && height == 32 = (False, False, 0x8F)
                                 | width == 128 && height == 64 = (True,  False, if vccExternal then 0x9F else 0xCF)
                                 | width == 96  && height == 16 = (False, False, if vccExternal then 0x10 else 0xAF)
                                 | width == 64  && height == 32 = (True,  False, if vccExternal then 0x10 else 0xCF)
                                 | otherwise                    = (False, False, 0x8F)
-    regwrite busdev regCOMMAND $ DriveComPins alt enable
-    regwrite busdev regCOMMAND $ DisplayContrast contrast
+    regwrite chip regCOMMAND $ DriveComPins alt enable
+    regwrite chip regCOMMAND $ DisplayContrast contrast
 
-    regwrite busdev regCOMMAND $ DrivePreCharge $ if vccExternal then 0x22 else 0xF1
+    regwrite chip regCOMMAND $ DrivePreCharge $ if vccExternal then 0x22 else 0xF1
 
-    regwrite busdev regCOMMAND $ DriveVComh 0x40
+    regwrite chip regCOMMAND $ DriveVComh 0x40
 
-    regwrite busdev regCOMMAND $ DisplayUseRAM True
+    regwrite chip regCOMMAND $ DisplayUseRAM True
 
-    regwrite busdev regCOMMAND $ DisplayInverse False
+    regwrite chip regCOMMAND $ DisplayInverse False
 
-    regwrite busdev regCOMMAND $ ScrollDisable
+    regwrite chip regCOMMAND $ ScrollDisable
 
-    regwrite busdev regCOMMAND $ DisplayOn
+    regwrite chip regCOMMAND $ DisplayOn
 
 
 -- | write image to RAM
 ssd1306Image :: SSD1306 -> ImageOLED -> IO ()
 ssd1306Image ssd img = do
 
-    let busdev = ssd1306_BusDevice ssd
+    let chip = ssd1306_Chip ssd
         width = ssd1306_Width ssd
         height = ssd1306_Height ssd
     
     -- end address 0xFF is OK since we use horizontal memory mode (we write columns before pages)
-    regwrite busdev regCOMMAND $ RAMPages 0x00 0xFF
+    regwrite chip regCOMMAND $ RAMPages 0x00 0xFF
 
-    regwrite busdev regCOMMAND $ RAMColumns 0x00 (0x00 + (fromIntegral $ width - 1))
+    regwrite chip regCOMMAND $ RAMColumns 0x00 (0x00 + (fromIntegral $ width - 1))
 
     -- TODO: use scroll functionality to setup automatic scroll if image is too large for the screen hardware
 
     -- write image to RAM
-    regwrite busdev regIMAGE img
+    regwrite chip regIMAGE img
 
 
 

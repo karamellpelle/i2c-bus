@@ -32,25 +32,25 @@ import I2C.Chip
 
 -- | Read data of type 'a' on chip.
 --   May throw 'I2C.Exception.I2CErr'.
-rawread :: forall a chip m . (Chip chip, Storable a, MonadIO m) => Internal.BusDevice chip -> m a
-rawread busdev = liftIO $ 
-    Internal.read busdev 0 (const $ pure ()) (sizeOf @a undefined) peek
+rawread :: forall a t m . (IsChip t, Storable a, MonadIO m) => Internal.Chip t -> m a
+rawread chip = liftIO $ 
+    Internal.read chip 0 (const $ pure ()) (sizeOf @a undefined) peek
 {-# INLINE rawread #-}
 
 -- | Write data of type 'a' on chip.
 --   May throw 'I2C.Exception.I2CErr'.
-rawwrite :: forall a chip m . (Chip chip, Storable a, MonadIO m)  => Internal.BusDevice chip -> a -> m ()
-rawwrite busdev = \w -> liftIO $
-    Internal.write busdev (sizeOf w) (flip poke w)
+rawwrite :: forall a t m . (IsChip t, Storable a, MonadIO m)  => Internal.Chip t -> a -> m ()
+rawwrite chip = \w -> liftIO $
+    Internal.write chip (sizeOf w) (flip poke w)
 {-# INLINE rawwrite #-}
 
 -- | Modify data of type 'a' on chip.
 --   May throw 'I2C.Exception.I2CErr'.
-rawmodify :: forall a chip m . (Chip chip, Storable a, MonadIO m)  => Internal.BusDevice chip -> (a -> a) -> m a
-rawmodify busdev = \f -> liftIO $ do
-    a <- rawread busdev
+rawmodify :: forall a t m . (IsChip t, Storable a, MonadIO m)  => Internal.Chip t -> (a -> a) -> m a
+rawmodify chip = \f -> liftIO $ do
+    a <- rawread chip
     let a' = f a
-    rawwrite busdev a'
+    rawwrite chip a'
     pure a'
 
 

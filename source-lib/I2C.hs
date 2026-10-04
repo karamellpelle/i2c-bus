@@ -18,10 +18,10 @@
 -- > 
 -- > testPCF8575 :: IO ()
 -- > testPCF8575 = do
--- >     busdev <- openChip @PCF8575 "/dev/i2c-1" 0x20
+-- >     chip <- openChip @PCF8575 "/dev/i2c-1" 0x20
 -- >     
 -- >     forM_ [0..0x00FF] $ \ix -> do
--- >         rawwrite @Word16LE busdev ix
+-- >         rawwrite @Word16LE chip ix
 -- >         threadDelay 400000
 --
 --------------------------------------------------------------------------------
@@ -29,7 +29,7 @@ module I2C
 (
 
     -- * Chip connection
-    Internal.BusDevice,
+    Internal.Chip,
     openChip,
     closeChip,
     I2CErr (..),
@@ -61,14 +61,14 @@ import I2C.TH
 -- | Open a connection to a chip of type 'chip' based on bus identifier and hardware address on bus.
 --   The bus identifier on Linux is typically something like @\/dev\/i2c-N@.
 --   May throw 'I2CErr'.
-openChip :: forall chip m . (Chip chip, MonadIO m) => 
+openChip :: forall t m . (IsChip t, MonadIO m) => 
             Text ->                       -- ^ Bus identifier
             ChipAddress ->                -- ^ /7 bit/ hardware address
-            m (Internal.BusDevice chip)
+            m (Internal.Chip t)
 openChip id addr = liftIO $ Internal.openChip id addr
 
 
 -- | Close connection to chip. 
 --   Shall not throw 'I2CErr'.
-closeChip :: forall chip m . (Chip chip, MonadIO m) => Internal.BusDevice chip -> m ()
-closeChip busdev = liftIO $ Internal.closeChip busdev
+closeChip :: forall t m . (IsChip t, MonadIO m) => Internal.Chip t -> m ()
+closeChip chip = liftIO $ Internal.closeChip chip

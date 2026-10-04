@@ -56,8 +56,8 @@ instance Show RegisterAddress where
 fromRegisterAddress :: Num b => RegisterAddress -> b
 fromRegisterAddress (RegisterAddress addr) = fromIntegral addr
 
--- | Index to a register of type 't'.
-data Register chip t = Register Text RegisterAddress
+-- | Index to a register of type 'a'.
+data Register chip a = Register Text RegisterAddress
 
 
 --------------------------------------------------------------------------------
@@ -65,25 +65,25 @@ data Register chip t = Register Text RegisterAddress
 
 -- | Read register.
 --   May throw 'I2C.Exception.I2CErr'.
-regread :: (Chip chip, Storable a, MonadIO m) => Internal.BusDevice chip -> Register chip a -> m a
-regread busdev (Register _name addr) = 
-    regread' busdev addr
+regread :: (IsChip t, Storable a, MonadIO m) => Internal.Chip t -> Register t a -> m a
+regread chip (Register _name addr) = 
+    regread' chip addr
 {-# INLINE regread #-}
 
 -- | Write register.
 --   May throw 'I2C.Exception.I2CErr'.
-regwrite :: (Chip chip, Storable a, MonadIO m) => Internal.BusDevice chip -> Register chip a -> a -> m ()
-regwrite busdev (Register _name addr) = 
-    regwrite' busdev addr
+regwrite :: (IsChip t, Storable a, MonadIO m) => Internal.Chip t -> Register t a -> a -> m ()
+regwrite chip (Register _name addr) = 
+    regwrite' chip addr
 {-# INLINE regwrite #-}
 
 -- | Modify register.
 --   May throw 'I2C.Exception.I2CErr'.
-regmodify :: (Chip chip, Storable a, MonadIO m) => Internal.BusDevice chip -> Register chip a -> (a -> a) -> m a
-regmodify = \busdev reg f -> do
-    a <- regread busdev reg
+regmodify :: (IsChip t, Storable a, MonadIO m) => Internal.Chip t -> Register t a -> (a -> a) -> m a
+regmodify = \chip reg f -> do
+    a <- regread chip reg
     let a' = f a
-    regwrite busdev reg a'
+    regwrite chip reg a'
     pure a'
 
 
@@ -92,24 +92,24 @@ regmodify = \busdev reg f -> do
 
 -- | Read register at address.
 --   May throw 'I2C.Exception.I2CErr'.
-regread' :: forall a chip m . (Chip chip, Storable a, MonadIO m) => Internal.BusDevice chip -> RegisterAddress -> m a
-regread' busdev addr = 
-    liftIO $ Internal.read busdev (sizeOf addr) (flip poke addr) (sizeOf @a undefined) peek
+regread' :: forall a t m . (IsChip t, Storable a, MonadIO m) => Internal.Chip t -> RegisterAddress -> m a
+regread' chip addr = 
+    liftIO $ Internal.read chip (sizeOf addr) (flip poke addr) (sizeOf @a undefined) peek
 {-# INLINE regread' #-}
 
 -- | Write register at address.
 --   May throw 'I2C.Exception.I2CErr'.
-regwrite' :: forall a chip m . (Chip chip, Storable a, MonadIO m) => Internal.BusDevice chip -> RegisterAddress -> a -> m ()
-regwrite' busdev addr = \a -> do
+regwrite' :: forall a t m . (IsChip t, Storable a, MonadIO m) => Internal.Chip t -> RegisterAddress -> a -> m ()
+regwrite' chip addr = \a -> do
     let w = StorableAB addr a
-    liftIO $ Internal.write busdev (sizeOf w) (flip poke w) 
+    liftIO $ Internal.write chip (sizeOf w) (flip poke w) 
 {-# INLINE regwrite' #-}
 
 -- | Modify register at address.
 --   May throw 'I2C.Exception.I2CErr'.
-regmodify' :: forall a chip m . (Chip chip, Storable a, MonadIO m) => Internal.BusDevice chip -> RegisterAddress -> (a -> a) -> m a
-regmodify' = \busdev addr f -> do
-    a <- regread' busdev addr
+regmodify' :: forall a t m . (IsChip t, Storable a, MonadIO m) => Internal.Chip t -> RegisterAddress -> (a -> a) -> m a
+regmodify' = \chip addr f -> do
+    a <- regread' chip addr
     let a' = f a
-    regwrite' busdev addr a'
+    regwrite' chip addr a'
     pure a'

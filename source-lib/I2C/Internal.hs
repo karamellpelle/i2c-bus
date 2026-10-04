@@ -29,13 +29,13 @@ import I2C.Internal.Linux
 --
 -- This module reexports the backend picked at compile time. A backend must implement the following:
 --
---  > data BusDevice chip
---  > openChip  :: (Chip chip) => Text -> ChipAddress -> IO (BusDevice chip)
---  > closeChip :: (Chip chip) => BusDevice chip -> IO ()
---  > write     :: (Chip chip) => BusDevice chip -> Int -> (Ptr w -> IO ()) -> IO ()
---  > read      :: (Chip chip) => BusDevice chip -> Int -> (Ptr w -> IO ()) -> Int -> (Ptr r -> IO r) -> IO r
---  > writeSome :: (Chip chip) => BusDevice chip -> Int -> (Ptr w -> IO ()) -> IO Int
---  > readSome  :: (Chip chip) => BusDevice chip -> Int -> (Ptr w -> IO ()) -> Int -> (Int -> Ptr r -> IO r)-> IO r
+--  > data Chip chip
+--  > openChip  :: (IsChip t) => Text -> ChipAddress -> IO (Chip t)
+--  > closeChip :: (IsChip t) => Chip t -> IO ()
+--  > write     :: (IsChip t) => Chip t -> Int -> (Ptr w -> IO ()) -> IO ()
+--  > read      :: (IsChip t) => Chip t -> Int -> (Ptr w -> IO ()) -> Int -> (Ptr r -> IO r) -> IO r
+--  > writeSome :: (IsChip t) => Chip t -> Int -> (Ptr w -> IO ()) -> IO Int
+--  > readSome  :: (IsChip t) => Chip t -> Int -> (Ptr w -> IO ()) -> Int -> (Int -> Ptr r -> IO r)-> IO r
 --
 -- See the documentation in "I2C.Internal.Linux" for more information on how a backend 
 -- implementation should behave.

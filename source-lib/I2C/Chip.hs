@@ -10,7 +10,7 @@
 module I2C.Chip
 (
     -- * Chip
-    Chip (..),
+    IsChip (..),
     -- ** Chip addressing
     ChipAddress (..),
     fromChipAddress,
@@ -28,7 +28,7 @@ import Data.Char (toUpper)
 --  chip
 
 -- | Typeclass for I2C chips
-class Chip chip where
+class IsChip t where
     {-# MINIMAL chipName #-}
     -- | Human readable name
     chipName :: Text

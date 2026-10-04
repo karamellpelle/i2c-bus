@@ -14,7 +14,7 @@ module I2C.Internal.Linux
     -- * Implementation of the backend API
 
     -- ** Chip connection
-    BusDevice (..),
+    Chip (..),
     openChip,
     closeChip,
 
@@ -54,37 +54,37 @@ import I2C.Exception
 --  
 
 -- | A connection to a hardware device on bus 
-data BusDevice chip = 
-    BusDevice Text ChipAddress (Ptr I2C_Client) 
+data Chip t = 
+    Chip Text ChipAddress (Ptr I2C_Client) 
 
 
-instance Chip chip => Show (BusDevice chip) where
-    show (BusDevice id addr _ptr) = "(BusDevice " <> (toString $ chipName @chip) <> " " <> show addr <> "@" <> toString id <> ")"
+instance IsChip t => Show (Chip t) where
+    show (Chip id addr _ptr) = "(Chip " <> (toString $ chipName @t) <> " " <> show addr <> "@" <> toString id <> ")"
 
 
 -- | Open a connection to a chip of type 'chip' based on bus identifier and hardware address on bus.
 --   The bus identifier on Linux is typically something like @\/dev\/i2c-N@.
 --   May throw 'I2CErr'.
-openChip :: forall chip . (Chip chip) => 
+openChip :: forall t . (IsChip t) => 
             Text ->                       -- ^ Bus identifier
             ChipAddress ->                -- ^ /7 bit/ hardware address
-            IO (BusDevice chip)
+            IO (Chip t)
 openChip busid addr = do
     (try @IOException $ openFd (fromIdentifier busid) ReadWrite defaultFileFlags) >>= \case
         Left err   -> throwIO $ fromIOException err
         Right fd   -> do
             assertOK' (tagErr busid addr) $ c_ioctl (fI fd) c_I2C_SLAVE_FORCE (fromChipAddress addr)
-            pure $ BusDevice busid addr $ fdToPtrI2C_Client fd
+            pure $ Chip busid addr $ fdToPtrI2C_Client fd
     where
       fromIdentifier = toString
-      tagErr busid addr = "openChip: could not find " <> chipName @chip <> " at " <> show addr <> " on bus " <> show busid
+      tagErr busid addr = "openChip: could not find " <> chipName @t <> " at " <> show addr <> " on bus " <> show busid
       fdToPtrI2C_Client = intPtrToPtr . fromIntegral 
 
 
 -- | Close connection to chip. 
 --   Shall not throw 'I2CErr'.
-closeChip :: forall chip . (Chip chip) => BusDevice chip -> IO ()
-closeChip busdev@(BusDevice _id _addr ptr) = do
+closeChip :: forall t . (IsChip t) => Chip t -> IO ()
+closeChip chip@(Chip _id _addr ptr) = do
     (try @IOException $ closeFd $ ptrI2C_ClientToFd ptr) >>= \case
         Left err  -> throwIO $ fromIOException err
         Right _   -> pure ()
@@ -94,15 +94,15 @@ closeChip busdev@(BusDevice _id _addr ptr) = do
 
 -- | Set timeout for transfers.
 --   May throw 'I2CErr'.
-chipTimeoutMs :: forall chip m . (Chip chip, MonadIO m) => 
-                 BusDevice chip ->                -- ^ BusDevice
+chipTimeoutMs :: forall t m . (IsChip t, MonadIO m) => 
+                 Chip t ->                -- ^ Chip
                  Word ->                          -- ^ Time in milliseconds
                  m ()
-chipTimeoutMs busdev@(BusDevice _id _addr ptr) ms = liftIO $ do
+chipTimeoutMs chip@(Chip _id _addr ptr) ms = liftIO $ do
     assertOK' tagErr $ c_ioctl (ptrI2C_ClientToFd ptr) c_I2C_TIMEOUT $ fromIntegral $ div ms 10
     pure ()
     where
-      tagErr = "chipTimeoutMs: could not set timeout to " <> show ms <> " ms on " <> show busdev
+      tagErr = "chipTimeoutMs: could not set timeout to " <> show ms <> " ms on " <> show chip
       ptrI2C_ClientToFd = fromIntegral . ptrToIntPtr 
 
 
@@ -115,23 +115,23 @@ chipTimeoutMs busdev@(BusDevice _id _addr ptr) ms = liftIO $ do
 --
 --      * Call shall fail if 'w' can't be written fully.
 --
-write :: forall chip w . (Chip chip) => 
-         BusDevice chip ->              -- ^ BusDevice
+write :: forall t w . (IsChip t) => 
+         Chip t ->              -- ^ Chip
          Int ->                         -- ^ Number of bytes to write 
          (Ptr w -> IO ())               -- ^ Write bytes 
          -> IO ()
-write busdev@(BusDevice _id addr ptr) sizeW pokeW = do
+write chip@(Chip _id addr ptr) sizeW pokeW = do
     let withMem = if sizeW <= maxAllocaBytes then allocaBytes else mallocBytes'
 
     res <- try @IOException $ withMem sizeW $ \mem -> do
         pokeW $ castPtr mem
-        assertOK' (tagErr busdev) $ c_i2c_write ptr (fromChipAddress addr) mem (fI sizeW)
+        assertOK' (tagErr chip) $ c_i2c_write ptr (fromChipAddress addr) mem (fI sizeW)
         pure ()
     case res of
         Right a   -> pure a
         Left err  -> throwIO $ fromIOException err
     where
-      tagErr busdev = "write " <> show busdev
+      tagErr chip = "write " <> show chip
       mallocBytes' size f = bracket (mallocBytes size) free f
     
 -- |  Read a specific amount of bytes. The reading can be prefixed by a write 
@@ -145,21 +145,21 @@ write busdev@(BusDevice _id addr ptr) sizeW pokeW = do
 --      * Call shall fail if 'w' can't be written fully.
 --      * Call shall fail if 'r' can't be read fully.
 --
-read :: forall chip w r . (Chip chip)  => 
-        BusDevice chip ->                   -- ^ BusDevice
+read :: forall t w r . (IsChip t)  => 
+        Chip t ->                   -- ^ Chip
         Int ->                              -- ^ Number of bytes to write
         (Ptr w -> IO ()) ->                 -- ^ Write bytes
         Int ->                              -- ^ Number of bytes to read
         (Ptr r -> IO r) ->                  -- ^ Read bytes into type 'r' 
         IO r
-read busdev@(BusDevice _id addr ptr) sizeW pokeW sizeR peekR = do
+read chip@(Chip _id addr ptr) sizeW pokeW sizeR peekR = do
     let size = max sizeW sizeR
         withMem = if size <= maxAllocaBytes then allocaBytes else mallocBytes'
 
     res <- try @IOException $ withMem size $ \mem -> do
         -- set write data. this data will be overwritten when reading
         pokeW $ castPtr mem
-        assertOK' (tagErr busdev) $ c_i2c_read ptr (fromChipAddress addr) mem (fI sizeW) mem (fI sizeR)
+        assertOK' (tagErr chip) $ c_i2c_read ptr (fromChipAddress addr) mem (fI sizeW) mem (fI sizeR)
         peekR $ castPtr mem
 
     case res of
@@ -167,7 +167,7 @@ read busdev@(BusDevice _id addr ptr) sizeW pokeW sizeR peekR = do
         Left err  -> throwIO $ fromIOException err
 
     where
-      tagErr busdev = "read " <> show busdev
+      tagErr chip = "read " <> show chip
       mallocBytes' size f = bracket (mallocBytes size) free f
     
 
@@ -181,12 +181,12 @@ read busdev@(BusDevice _id addr ptr) sizeW pokeW sizeR peekR = do
 --    of bytes written.
 --
 --    May throw 'I2CErr'. 
-writeSome :: forall chip w . (Chip chip) => 
-             BusDevice chip ->              -- ^ BusDevice
+writeSome :: forall t w . (IsChip t) => 
+             Chip t ->              -- ^ Chip
              Int ->                         -- ^ Number of bytes to write
              (Ptr w -> IO ()) ->            -- ^ Write bytes 
              IO Int
-writeSome busdev sizeW pokeW =
+writeSome chip sizeW pokeW =
     throwIO $ errI2C eNOSYS "writeSome not implemented on Linux"
 {-# WARNING writeSome "Not implemented on Linux; throws 'I2CErr'" #-}
 
@@ -201,14 +201,14 @@ writeSome busdev sizeW pokeW =
 --  
 --      * Call shall fail if 'w' can't be written fully.
 --
-readSome :: forall chip w r . (Chip chip) => 
-            BusDevice chip ->                 -- ^ BusDevice
+readSome :: forall t w r . (IsChip t) => 
+            Chip t ->                 -- ^ Chip
             Int ->                            -- ^ Number of bytes to write 
             (Ptr w -> IO ()) ->               -- ^ Write bytes 
             Int ->                            -- ^ Number of bytes to read 
             (Int -> Ptr r -> IO r)            -- ^ Read the given number of bytes into type 'r'. May throw 'I2CErr'.
             -> IO r
-readSome busdev sizeW pokeW sizeR peekR' = 
+readSome chip sizeW pokeW sizeR peekR' = 
     throwIO $ errI2C eNOSYS "readSome not implemented on Linux"
 {-# WARNING readSome "Not implemented on Linux; throws 'I2CErr'" #-}
 

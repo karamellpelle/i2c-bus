@@ -77,10 +77,10 @@ $(chip "PCF8575")
 
 testPCF8575 :: IO ()
 testPCF8575 = do
-    busdev <- openChip @PCF8575 "/dev/i2c-1" 0x20
+    chip <- openChip @PCF8575 "/dev/i2c-1" 0x20
     
     forM_ [0..0x00FF] $ \ix -> do
-        rawwrite @Word16LE busdev ix
+        rawwrite @Word16LE chip ix
         threadDelay 400000
 
 
@@ -124,17 +124,17 @@ $(register  ''MPU6050 0x41 "TEMP_OUT" ''TemperatureC)
 
 testMPU6050 :: IO ()
 testMPU6050 = do
-    busdev <- openChip "/dev/i2c-1" 0x68
+    chip <- openChip "/dev/i2c-1" 0x68
 
-    regwrite busdev regUSER_CTRL  $ def & bitsetFIFO_RESET & bitsetI2C_MST_RESET & bitsetSIG_COND_RESET
-    regwrite busdev regPWR_MGMT_1 $ def & setCLKSEL 2 & bitclearSLEEP
+    regwrite chip regUSER_CTRL  $ def & bitsetFIFO_RESET & bitsetI2C_MST_RESET & bitsetSIG_COND_RESET
+    regwrite chip regPWR_MGMT_1 $ def & setCLKSEL 2 & bitclearSLEEP
 
     forever $ do
 
-        t <- regread busdev regTEMP_OUT
+        t <- regread chip regTEMP_OUT
         print t
 
-        --a <- regread' @TemperatureC busdev 0x41
+        --a <- regread' @TemperatureC chip 0x41
         --print a
 
         threadDelay 400000

@@ -152,7 +152,7 @@ getShowVariant =
 -- > $(chip "MYCHIP")
 -- > ======>
 -- >   data MYCHIP deriving Show
--- >   instance Chip MYCHIP where
+-- >   instance IsChip MYCHIP where
 -- >     chipName = "MYCHIP"
 --
 chip :: String -> -- ^ Name of data type
@@ -172,7 +172,7 @@ instanceChip :: Name -> Q [Dec]
 instanceChip ty = do
     let dName :: Q Dec
         dName = funD 'chipName $ one $ clause [] (normalB $ litE $ stringL $ nameBase ty ) []
-    fmap one $ instanceD (cxt []) (appT (conT ''Chip) (conT ty)) [dName]
+    fmap one $ instanceD (cxt []) (appT (conT ''IsChip) (conT ty)) [dName]
 
 
 --------------------------------------------------------------------------------
