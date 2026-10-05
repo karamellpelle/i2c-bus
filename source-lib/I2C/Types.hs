@@ -142,7 +142,7 @@ instance Storable Word64BE where
 
 -- | A storable representation of 'a' and 'b' on a chip
 data StorableAB a b = 
-    StorableAB !a !b
+    StorableAB a b
 
 
 instance (Storable a, Storable b) => Storable (StorableAB a b) where
