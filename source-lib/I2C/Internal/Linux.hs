@@ -62,7 +62,7 @@ instance IsChip t => Show (Chip t) where
     show (Chip id addr _ptr) = "(Chip " <> (toString $ chipName @t) <> " " <> show addr <> "@" <> toString id <> ")"
 
 
--- | Open a connection to a chip of type 'chip' based on bus identifier and hardware address on bus.
+-- | Open a connection to a chip of type 't' based on bus identifier and hardware address on bus.
 --   The bus identifier on Linux is typically something like @\/dev\/i2c-N@.
 --   May throw 'I2CErr'.
 openChip :: forall t . (IsChip t) => 
