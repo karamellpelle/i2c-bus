@@ -4,4 +4,3 @@
 * Is the `IsChip` constraint a bit unnecessary? This typeclass is only used for a custom `Show`, otherwise no functions use that property.
   If this typeclass would be populated more, what functionality could that be? Manufacturer name? Capabilities? Could this type be used 
   as data for the type `Chip`? 
-* Should `Storable a b` be UNPACKed?

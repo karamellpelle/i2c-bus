@@ -118,6 +118,8 @@ $(field ''USER_CTRL "SIG_COND_RESET"  "0000000*")
 
 $(register8 ''MPU6050 0x6B "PWR_MGMT_1" 0x40)
 $(field ''PWR_MGMT_1 "CLKSEL"         "00000***")
+
+$(setFieldInline True) -- this adds INLINE pragma to generated functions
 $(field ''PWR_MGMT_1 "SLEEP"          "0*000000")
 
 $(register  ''MPU6050 0x41 "TEMP_OUT" ''TemperatureC)
