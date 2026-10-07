@@ -124,6 +124,6 @@ tests:
             - -with-rtsopts "-N -T"
         dependencies:
             - i2c-bus
-            - JuicyPixels
+            - JuicyPixels   >= 3.3.7 && < 3.4
 
     # also see tests/GHCI.hs
