@@ -31,17 +31,16 @@ extra-source-files:
     - cbits/foreign.h
 
 synopsis:
-    Typed I2C communication with utilities 
+    Typed I2C communication
 
 description: |
-    Library for typed I2C communication with utilities for working with registers. 
-    Importing the module `I2C` will give you what you need unless you need access 
-    to low level functionality provided by your backend.
+    Library for I2C communication with utilities for working with registers, etc.
+    Just import the module "I2C", and you will typically get everything you need.
     
     == Features
     * Connections to chips on I2C buses.
     * A module "I2C.Raw" to perform direct write and read using `Storable` types.
-    * A module "I2C.Register" to work with chips that uses byte registers. 
+    * A module "I2C.Register" to work with chips that use byte registers. 
     * An exception type 'I2C.Exception.I2CErr'
     * Types for binary serialization between host architecture and chip hardware.
     * Handy utilities through Template Haskell to define chips, registers and 

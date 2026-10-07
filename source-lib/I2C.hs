@@ -6,10 +6,11 @@
 -- Maintainer              : karamellpelle@hotmail.com
 -- Stability               : experimental
 -- 
--- Main module for communication on the I2C bus. Importing this module 
--- will typically give you all that you need.
+-- Main module for communication on the I2C bus. This module will give you all 
+-- that you need, unless you need access to low level functionality provided 
+-- by your backend.
 --
--- Example: 
+-- == Example
 --
 -- > {-# LANGUAGE TemplateHaskell #-}
 -- > import I2C
