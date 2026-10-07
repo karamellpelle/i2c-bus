@@ -29,7 +29,7 @@ import I2C.Internal.Linux
 --
 -- This module reexports the backend picked at compile time. A backend must implement the following:
 --
---  > data Chip chip
+--  > data Chip t
 --  > openChip  :: (IsChip t) => Text -> ChipAddress -> IO (Chip t)
 --  > closeChip :: (IsChip t) => Chip t -> IO ()
 --  > write     :: (IsChip t) => Chip t -> Int -> (Ptr w -> IO ()) -> IO ()

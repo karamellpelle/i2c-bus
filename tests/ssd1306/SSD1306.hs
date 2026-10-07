@@ -38,7 +38,14 @@ import Codec.Picture.Gif
 import Data.ByteString qualified as BS
 import Control.Concurrent (threadDelay)
 
+
+--------------------------------------------------------------------------------
+-- based on the AdaFruit library:
+-- https://github.com/adafruit/Adafruit_SSD1306/blob/master/Adafruit_SSD1306.cpp
+--
 -- to load this in ghci: `stack ghci --test i2c-bus:test:ssd1306`
+--
+--------------------------------------------------------------------------------
 
 
 --------------------------------------------------------------------------------
@@ -185,7 +192,6 @@ openSSD1306 busid = do
 
 -- | initialize a SSD1306 chip. 
 --   based on the Adafruit_SSD1306 library, 
---   https://github.com/adafruit/Adafruit_SSD1306/blob/master/Adafruit_SSD1306.cpp
 ssd1306Init :: SSD1306 -> IO ()
 ssd1306Init ssd = do
     
