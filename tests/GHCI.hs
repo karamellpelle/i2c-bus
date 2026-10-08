@@ -21,14 +21,13 @@ import Foreign
 import Language.Haskell.TH
 import Language.Haskell.TH.Syntax
 import Language.Haskell.TH.Lib
-import Data.Storable.Endian
 
 
 --------------------------------------------------------------------------------
 --
 -- * load ghci (with extra package pretty-simple that provides handy `pPrint` function):
 --
---    $ stack ghci --package=pretty-simple --package=storable-endian
+--    $ stack ghci --package=pretty-simple 
 --
 -- then load this file:
 --
@@ -105,10 +104,10 @@ instance Storable TemperatureC where
     sizeOf a = 2
     alignment a = 1
     peek ptr = do
-        n <- peekBE @Int16 $ castPtr ptr
+        n <- peek @Int16BE $ castPtr ptr
         pure $ TemperatureC $ (fromIntegral n) / 340.0 + 36.53
     poke ptr (TemperatureC a) = do
-        pokeBE @Int16 (castPtr ptr) $ truncate $ (a - 36.53) * 340.0
+        poke @Int16BE (castPtr ptr) $ truncate $ (a - 36.53) * 340.0
 
 
 $(chip "MPU6050")

@@ -35,6 +35,7 @@ synopsis:
 
 description: |
     Library for I2C communication with utilities for working with registers, etc.
+
     Just import the module "I2C", and you will typically get everything you need.
     
     == Features
