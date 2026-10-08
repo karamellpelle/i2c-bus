@@ -58,7 +58,7 @@ import Data.Char (toUpper)
 
 -- $storableTypes
 --
--- These Word variants are just newtypes and have the same endianness as the 
+-- These Word and Int variants are just newtypes and have the same endianness as the 
 -- host architecture, but overrides their 'Storable' instance so that they can 
 -- be binary serialized as little endian or big endian. This is useful when
 -- communicating between host architecture and chip hardware.

@@ -29,6 +29,8 @@ extra-source-files:
     - README.md
     - CHANGELOG.md
     - cbits/foreign.h
+    - tests/GHCI.hs
+    - tests/ssd1306/haskell-128x32.gif
 
 synopsis:
     Typed I2C communication
@@ -40,9 +42,9 @@ description: |
     
     == Features
     * Connections to chips on I2C buses.
-    * A module "I2C.Raw" to perform direct write and read using `Storable` types.
-    * A module "I2C.Register" to work with chips that use byte registers. 
     * An exception type 'I2C.Exception.I2CErr'
+    * A module "I2C.Raw" to perform direct write and read using `Storable` types.
+    * A module "I2C.Register" to work with chips that use registers. 
     * Types for binary serialization between host architecture and chip hardware.
     * Handy utilities through Template Haskell to define chips, registers and 
       (sub)fields of registers.
@@ -115,11 +117,13 @@ library:
           - /usr/include
           - cbits
 when:
+  # pick backend
   - condition: os( linux )
     cpp-options: -UINTERNAL_USE_EMPTY -DINTERNAL_USE_LINUX
 
-  # TODO: add architectures to big or little endian
-    #     see values of 'arch' here: https://hackage-content.haskell.org/package/base-4.22.0.0/docs/System-Info.html#v:arch
+  # big or little endian
+  # TODO: add more architectures to either big or little endian.
+  #       see values of 'arch' here: https://hackage-content.haskell.org/package/base-4.22.0.0/docs/System-Info.html#v:arch
   - condition: arch( aarch64 ) || arch( i386 ) || arch( x86_64 )
     cpp-options: -UARCH_IS_UNKNOWN -DARCH_IS_LITTLE_ENDIAN
   #- condition: # 

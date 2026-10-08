@@ -4,9 +4,9 @@ Library for typed I2C communication with utilities for working with registers. I
 
 ## Features
 * Connections to chips on I2C buses.
-* A module `I2C.Raw` to perform direct write and read using `Storable` types.
-* A module `I2C.Register` to work with chips that use byte registers. 
 * An exception type `I2CErr`.
+* A module `I2C.Raw` to perform direct write and read using `Storable` types.
+* A module `I2C.Register` to work with chips that use registers. 
 * Types for binary serialization between host architecture and chip hardware.
 * Handy utilities through Template Haskell to define chips, registers and (sub)fields of registers.
 * Settings to control the code generation by Template Haskell.

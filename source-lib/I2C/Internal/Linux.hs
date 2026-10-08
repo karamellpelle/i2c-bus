@@ -74,36 +74,36 @@ openChip busid addr = do
         Left err   -> throwIO $ fromIOException err
         Right fd   -> do
             assertOK' (tagErr busid addr) $ c_ioctl (fI fd) c_I2C_SLAVE_FORCE (fromChipAddress addr)
-            pure $ Chip busid addr $ fdToPtrI2C_Client fd
+            pure $ Chip busid addr $ fdToPtr fd
     where
       fromIdentifier = toString
       tagErr busid addr = "openChip: could not find " <> chipName @t <> " at " <> show addr <> " on bus " <> show busid
-      fdToPtrI2C_Client = intPtrToPtr . fromIntegral 
+      fdToPtr = intPtrToPtr . fromIntegral 
 
 
 -- | Close connection to chip. 
 --   Shall not throw 'I2CErr'.
 closeChip :: forall t . (IsChip t) => Chip t -> IO ()
 closeChip chip@(Chip _id _addr ptr) = do
-    (try @IOException $ closeFd $ ptrI2C_ClientToFd ptr) >>= \case
+    (try @IOException $ closeFd $ ptrToFd ptr) >>= \case
         Left err  -> throwIO $ fromIOException err
         Right _   -> pure ()
     where
-      ptrI2C_ClientToFd = fromIntegral . ptrToIntPtr 
+      ptrToFd = fromIntegral . ptrToIntPtr 
 
 
 -- | Set timeout for transfers.
 --   May throw 'I2CErr'.
 chipTimeoutMs :: forall t m . (IsChip t, MonadIO m) => 
-                 Chip t ->                -- ^ Chip
-                 Word ->                          -- ^ Time in milliseconds
+                 Chip t ->              -- ^ Chip
+                 Word ->                -- ^ Time in milliseconds
                  m ()
 chipTimeoutMs chip@(Chip _id _addr ptr) ms = liftIO $ do
-    assertOK' tagErr $ c_ioctl (ptrI2C_ClientToFd ptr) c_I2C_TIMEOUT $ fromIntegral $ div ms 10
+    assertOK' tagErr $ c_ioctl (ptrToFd ptr) c_I2C_TIMEOUT $ fromIntegral $ div ms 10
     pure ()
     where
       tagErr = "chipTimeoutMs: could not set timeout to " <> show ms <> " ms on " <> show chip
-      ptrI2C_ClientToFd = fromIntegral . ptrToIntPtr 
+      ptrToFd = fromIntegral . ptrToIntPtr 
 
 
 --------------------------------------------------------------------------------
@@ -116,10 +116,10 @@ chipTimeoutMs chip@(Chip _id _addr ptr) ms = liftIO $ do
 --      * Call shall fail if 'w' can't be written fully.
 --
 write :: forall t w . (IsChip t) => 
-         Chip t ->              -- ^ Chip
+         Chip t ->                      -- ^ Chip
          Int ->                         -- ^ Number of bytes to write 
-         (Ptr w -> IO ())               -- ^ Write bytes 
-         -> IO ()
+         (Ptr w -> IO ()) ->            -- ^ Write bytes from type 'w'
+         IO ()
 write chip@(Chip _id addr ptr) sizeW pokeW = do
     let withMem = if sizeW <= maxAllocaBytes then allocaBytes else mallocBytes'
 
@@ -134,6 +134,7 @@ write chip@(Chip _id addr ptr) sizeW pokeW = do
       tagErr chip = "write " <> show chip
       mallocBytes' size f = bracket (mallocBytes size) free f
     
+
 -- |  Read a specific amount of bytes. The reading can be prefixed by a write 
 --    of a given amount of bytes if that size is non-zero. 
 --
@@ -146,9 +147,9 @@ write chip@(Chip _id addr ptr) sizeW pokeW = do
 --      * Call shall fail if 'r' can't be read fully.
 --
 read :: forall t w r . (IsChip t)  => 
-        Chip t ->                   -- ^ Chip
+        Chip t ->                           -- ^ Chip
         Int ->                              -- ^ Number of bytes to write
-        (Ptr w -> IO ()) ->                 -- ^ Write bytes
+        (Ptr w -> IO ()) ->                 -- ^ Write bytes from type 'w'
         Int ->                              -- ^ Number of bytes to read
         (Ptr r -> IO r) ->                  -- ^ Read bytes into type 'r' 
         IO r
@@ -177,14 +178,14 @@ read chip@(Chip _id addr ptr) sizeW pokeW sizeR peekR = do
 --  TODO: define events at which we should throw 'I2CErr'
 
 
--- |  Write an arbitrary amount of bytes until completion or NACK by slave. Returns the number
---    of bytes written.
+-- |  Write an arbitrary amount of bytes until completion or NACK by slave. 
+--    Returns the number of bytes written.
 --
 --    May throw 'I2CErr'. 
 writeSome :: forall t w . (IsChip t) => 
-             Chip t ->              -- ^ Chip
+             Chip t ->                      -- ^ Chip
              Int ->                         -- ^ Number of bytes to write
-             (Ptr w -> IO ()) ->            -- ^ Write bytes 
+             (Ptr w -> IO ()) ->            -- ^ Write bytes from type 'w'
              IO Int
 writeSome chip sizeW pokeW =
     throwIO $ errI2C eNOSYS "writeSome not implemented on Linux"
@@ -202,12 +203,12 @@ writeSome chip sizeW pokeW =
 --      * Call shall fail if 'w' can't be written fully.
 --
 readSome :: forall t w r . (IsChip t) => 
-            Chip t ->                 -- ^ Chip
+            Chip t ->                         -- ^ Chip
             Int ->                            -- ^ Number of bytes to write 
-            (Ptr w -> IO ()) ->               -- ^ Write bytes 
+            (Ptr w -> IO ()) ->               -- ^ Write bytes from type 'w'
             Int ->                            -- ^ Number of bytes to read 
-            (Int -> Ptr r -> IO r)            -- ^ Read the given number of bytes into type 'r'. May throw 'I2CErr'.
-            -> IO r
+            (Int -> Ptr r -> IO r) ->         -- ^ Read the given number of bytes into type 'r'. May throw 'I2CErr'.
+            IO r
 readSome chip sizeW pokeW sizeR peekR' = 
     throwIO $ errI2C eNOSYS "readSome not implemented on Linux"
 {-# WARNING readSome "Not implemented on Linux; throws 'I2CErr'" #-}
@@ -252,7 +253,10 @@ assertOK' str ma = do
 --    * ioctl(file, I2C_TIMEOUT, unsigned long *funcs): timeout in 10 ms
 --    
 
--- | Data type for the Linux C API for I2C
+-- | Data type to be used as 'Ptr I2C_Client' argument for the Linux I2C API.
+--
+--   Take a look at 'Foreign.Ptr.ptrToIntPtr' if you need an Int representation 
+--   as 'fd' argument for @ioctl()@ C calls.
 data I2C_Client
 
 -- |  > /* Use this slave address, even if it is already in use by a driver! */
