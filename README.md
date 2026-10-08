@@ -28,7 +28,29 @@ testPCF8575 = do
     forM_ [0..0x00FF] $ \ix -> do
         rawwrite @Word16LE chip ix
         threadDelay 400000
-~~~
+
+
+$(chip "MYCHIP")
+
+$(register8 ''MYCHIP 0x22 "MY8" 0x83)
+-- ^ a register of type 'Word8' named MY8 at address 0x22 with default 
+--   value 0x83. this generates a type 'MY8' and a value 
+--   'regMY8 :: Register MYCHIP MY8'
+
+$(field ''MY8   "A_FIELD"  "0000***0")
+-- ^ MY8 contains a 3 bit (sub)field named A_FIELD. this generates a 
+--   type 'A_FIELD' with get and set functions over the 'MY8' type.
+
+$(field ''MY8   "A_BIT"    "00*00000")
+-- ^ MY8 also has a one bit field named A_BIT. this generates a type
+--   'A_BIT' with get and set functions over the 'MY8' type, and 
+--   additional functions for bit manipulation (bitset, bitclear, bittoggle).
+
+$(register ''MYCHIP 0x33 "MY_A" ''A)
+-- ^ a register of type 'A' named MY_A at address 0x33. 
+--   this generates a value 'regMY_A :: Register MYCHIP A'. the type
+--   'A' must be an instance of 'Storable', and the Storable implementation 
+--   is relative to the chip hardware.
 
 See [tests/GHCI.hs](tests/GHCI.hs) and [tests/ssd1306](tests/ssd1306) for more examples. 
 
