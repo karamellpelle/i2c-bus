@@ -125,17 +125,22 @@ instance Storable Command where
 --
 data ImageOLED = ImageOLED (Image PixelRGB8)
 
+-- max pixel width by chip
+oledW :: Int
+oledW = 128
+
+-- max pixel height by chip
+oledH :: Int
+oledH = 64
 
 -- | the Blue pixel component of image defines the pixels of our screen
 instance Storable ImageOLED where
-    sizeOf _                   = fromIntegral $ 128 * (div 64 8)
+    sizeOf _                   = oledW * (div oledH 8) -- divide by 8 since each byte represent a 8 pixel column
     alignment _                = 1
     peek ptr                   = undefined
     poke ptr a@(ImageOLED img) = forM_ (range 0 $ sizeOf a) $ \ix -> do
-        let w = 128
-            h = 64
-            i = mod ix w
-            j = (div ix w) * 8
+        let i = mod ix oledW
+            j = (div ix oledW) * (div oledH 8)
         pokeByteOff @Word8 ptr ix $ fromCell i j 0b00000001
         where
           range b e = if b == e then [] else b : range (b + 1) e
@@ -163,7 +168,7 @@ data SSD1306  = SSD1306 {
               }
 
 
-instance Chip SSD1306 where
+instance IsChip SSD1306 where
     chipName = "SSD1306"
 
 $(register ''SSD1306 0x00 "COMMAND" ''Command)
