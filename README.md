@@ -51,6 +51,7 @@ $(register ''MYCHIP 0x33 "MY_A" ''A)
 --   this generates a value 'regMY_A :: Register MYCHIP A'. the type
 --   'A' must be an instance of 'Storable', and the Storable implementation 
 --   is relative to the chip hardware.
+~~~
 
 See [tests/GHCI.hs](tests/GHCI.hs) and [tests/ssd1306](tests/ssd1306) for more examples. 
 
