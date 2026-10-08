@@ -20,12 +20,18 @@ module I2C.Types
     Word32LE (..),
     Word64LE (..),
 
+    Int16LE (..),
+    Int32LE (..),
+    Int64LE (..),
+
     -- ** Big endian
     Word16BE (..),
     Word32BE (..),
     Word64BE (..),
 
     Int16BE (..),
+    Int32BE (..),
+    Int64BE (..),
 
     -- * Other
     StorableAB (..),
@@ -155,6 +161,53 @@ instance Storable Word64BE where
 --------------------------------------------------------------------------------
 --  signed variants
 
+newtype Int16LE = Int16LE Int16
+    deriving (Eq, Bits, Num, Integral, Enum, Real, Ord)
+
+instance Storable Int16LE where
+    sizeOf w = sizeOf $ un @Int16 w
+    alignment w = alignment $ un @Int16 w
+#ifdef ARCH_IS_BIG_ENDIAN
+    peek = \ptr -> fmap (wrap . word16ToInt16 . byteSwap16) $ peek @Word16 $ castPtr ptr
+    poke = \ptr w -> poke (castPtr ptr) $ byteSwap16 $ int16ToWord16 $ un @Int16 w
+#else
+    peek = \ptr -> fmap wrap $ peek @Int16 $ castPtr ptr
+    poke = \ptr w -> poke (castPtr ptr) $ un @Int16 w
+#endif
+
+
+newtype Int32LE = Int32LE Int32
+    deriving (Eq, Bits, Num, Integral, Enum, Real, Ord)
+
+instance Storable Int32LE where
+    sizeOf w = sizeOf $ un @Int32 w
+    alignment w = alignment $ un @Int32 w
+#ifdef ARCH_IS_BIG_ENDIAN
+    peek = \ptr -> fmap (wrap . word32ToInt32 . byteSwap32) $ peek @Word32 $ castPtr ptr
+    poke = \ptr w -> poke (castPtr ptr) $ byteSwap32 $ int32ToWord32 $ un @Int32 w
+#else
+    peek = \ptr -> fmap wrap $ peek @Int32 $ castPtr ptr
+    poke = \ptr w -> poke (castPtr ptr) $ un @Int32 w
+#endif
+
+
+newtype Int64LE = Int64LE Int64
+    deriving (Eq, Bits, Num, Integral, Enum, Real, Ord)
+
+instance Storable Int64LE where
+    sizeOf w = sizeOf $ un @Int64 w
+    alignment w = alignment $ un @Int64 w
+#ifdef ARCH_IS_BIG_ENDIAN
+    peek = \ptr -> fmap (wrap . word64ToInt64 . byteSwap64) $ peek @Word64 $ castPtr ptr
+    poke = \ptr w -> poke (castPtr ptr) $ byteSwap64 $ int64ToWord64 $ un @Int64 w
+#else
+    peek = \ptr -> fmap wrap $ peek @Int64 $ castPtr ptr
+    poke = \ptr w -> poke (castPtr ptr) $ un @Int64 w
+#endif
+
+
+
+
 newtype Int16BE = Int16BE Int16
     deriving (Eq, Bits, Num, Integral, Enum, Real, Ord)
 
@@ -167,6 +220,36 @@ instance Storable Int16BE where
 #else
     peek = \ptr -> fmap wrap $ peek @Int16 $ castPtr ptr
     poke = \ptr w -> poke (castPtr ptr) $ un @Int16 w
+#endif
+
+
+newtype Int32BE = Int32BE Int32
+    deriving (Eq, Bits, Num, Integral, Enum, Real, Ord)
+
+instance Storable Int32BE where
+    sizeOf w = sizeOf $ un @Int32 w
+    alignment w = alignment $ un @Int32 w
+#ifdef ARCH_IS_LITTLE_ENDIAN
+    peek = \ptr -> fmap (wrap . word32ToInt32 . byteSwap32) $ peek @Word32 $ castPtr ptr
+    poke = \ptr w -> poke (castPtr ptr) $ byteSwap32 $ int32ToWord32 $ un @Int32 w
+#else
+    peek = \ptr -> fmap wrap $ peek @Int32 $ castPtr ptr
+    poke = \ptr w -> poke (castPtr ptr) $ un @Int32 w
+#endif
+
+
+newtype Int64BE = Int64BE Int64
+    deriving (Eq, Bits, Num, Integral, Enum, Real, Ord)
+
+instance Storable Int64BE where
+    sizeOf w = sizeOf $ un @Int64 w
+    alignment w = alignment $ un @Int64 w
+#ifdef ARCH_IS_LITTLE_ENDIAN
+    peek = \ptr -> fmap (wrap . word64ToInt64 . byteSwap64) $ peek @Word64 $ castPtr ptr
+    poke = \ptr w -> poke (castPtr ptr) $ byteSwap64 $ int64ToWord64 $ un @Int64 w
+#else
+    peek = \ptr -> fmap wrap $ peek @Int64 $ castPtr ptr
+    poke = \ptr w -> poke (castPtr ptr) $ un @Int64 w
 #endif
 
 
