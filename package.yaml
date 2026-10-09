@@ -95,13 +95,14 @@ default-extensions:
 library:
     source-dirs: source-lib
     exposed-modules:
-        - I2C
-        - I2C.Types
         - I2C.Chip
+        - I2C.Exception
         - I2C.Internal
-        - I2C.Register
+        - I2C.Types
         - I2C.Raw
+        - I2C.Register
         - I2C.TH
+        - I2C
     other-extensions:
         - CPP
     when: 

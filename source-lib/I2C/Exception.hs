@@ -8,11 +8,13 @@
 --------------------------------------------------------------------------------
 module I2C.Exception
 (
+    -- * Exception
     I2CErr (..),
 
     -- ** Utils 
     errI2C,
     fromIOException,
+    showErrno,
 
 ) where
 
@@ -39,11 +41,11 @@ instance Exception I2CErr where
 instance Show I2CErr where
     show (I2CErr errno text) = 
         "I2CErr " <> show (un @CInt errno) <> " " <> case text of
-            "" -> toString $ strErrno errno
+            "" -> toString $ showErrno errno
             _  -> toString $ text
 
 
--- | Create 'I2CErr' from 'Errno' and descrition
+-- | Create 'I2CErr' from 'Errno' and description
 errI2C :: Errno -> Text -> I2CErr
 errI2C = I2CErr
 
@@ -52,11 +54,9 @@ fromIOException :: IOException -> I2CErr
 fromIOException err = 
     errI2C (wrap @Errno $ ioe_errno err ?: 1) $ toText (displayException err)
 
---------------------------------------------------------------------------------
---  
-
-strErrno :: Errno -> Text
-strErrno errno = case un @CInt errno of
+-- | Convert 'Errno' to human readable name
+showErrno :: Errno -> Text
+showErrno errno = case un @CInt errno of
     -- linux/include/uapi/asm-generic/errno-base.h
     1   -> "Operation not permitted"
     2   -> "No such file or directory"
