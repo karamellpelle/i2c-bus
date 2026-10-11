@@ -8,6 +8,7 @@
 --
 -- Utilities for working with chips with registers.
 --------------------------------------------------------------------------------
+{-# OPTIONS_GHC -Wno-deprecations #-}
 module I2C.Register
 (
     -- * Register
@@ -44,7 +45,6 @@ import I2C.Types
 --  Register
 
 -- | Register addressing inside chips.
---   Register addresses are of size 1 byte (256 possible registers)
 newtype RegisterAddress = RegisterAddress Word8
     deriving (Num, Storable)
 
@@ -57,7 +57,7 @@ fromRegisterAddress :: Num b => RegisterAddress -> b
 fromRegisterAddress (RegisterAddress addr) = fromIntegral addr
 
 -- | Index to a register of type 'a'.
-data Register chip a = Register Text RegisterAddress
+data Register t a = Register Text RegisterAddress
 
 
 --------------------------------------------------------------------------------

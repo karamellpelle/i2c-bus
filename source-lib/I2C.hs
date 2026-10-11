@@ -6,9 +6,9 @@
 -- Maintainer              : karamellpelle@hotmail.com
 -- Stability               : experimental
 -- 
--- Main module for communication on the I2C bus. This module will give you all 
--- that you need, unless you need access to low level functionality provided 
--- by your backend.
+-- Main module for communication over the I2C bus. This module will typically 
+-- give you all that you need, unless you need access to low level functionality 
+-- provided by your backend.
 --
 -- == Example
 --

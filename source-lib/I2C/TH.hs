@@ -68,7 +68,7 @@ import Language.Haskell.TH.Lib
 --
 -- Settings that control code generation. A new setting only applies to 
 -- the TH calls that follows, hence you can have different settings for different
--- calls.
+-- TH calls.
 -- 
 
 data QSetting = QSetting {
@@ -224,8 +224,7 @@ register tychip addr name ty = do
 --
 -- > $(register8 ''MYCHIP 0x22 "MY8" 0x83)
 -- > ======>
--- >   newtype MY8
--- >     = MY8 Word8
+-- >   newtype MY8 = MY8 Word8
 -- >     deriving Storable
 -- >     deriving Eq
 -- >   instance Default MY8 where
@@ -235,7 +234,7 @@ register tychip addr name ty = do
 -- >   regMY8 :: Register MYCHIP MY8
 -- >   regMY8 = Register "MY8" 34
 register8 :: Name ->            -- ^ Chip this register belongs to
-             RegisterAddress -> -- ^ Register address on chip      
+             RegisterAddress -> -- ^ Register address chip      
              String ->          -- ^ Register name                 
              Word8 ->           -- ^ Default value (if any)
              Q [Dec]

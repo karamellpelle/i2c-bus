@@ -109,7 +109,7 @@ chipTimeoutMs chip@(Chip _id _addr ptr) ms = liftIO $ do
 --------------------------------------------------------------------------------
 --  internal transaction API
 
--- |  Write a specific amount of bytes.
+-- |  Write a specific number of bytes.
 --
 --    May throw 'I2CErr', some specific cases are:
 --
@@ -135,8 +135,8 @@ write chip@(Chip _id addr ptr) sizeW pokeW = do
       mallocBytes' size f = bracket (mallocBytes size) free f
     
 
--- |  Read a specific amount of bytes. The reading can be prefixed by a write 
---    of a given amount of bytes if that size is non-zero. 
+-- |  Read a specific number of bytes. The read operation will be preceeded by a 
+--    write operation of a given number of bytes if that size is non-zero. 
 --
 --    It is very encouraged that the backend implement this as a "repeated START" 
 --    transaction, since that's the whole reason for the write parameter. 
@@ -178,7 +178,7 @@ read chip@(Chip _id addr ptr) sizeW pokeW sizeR peekR = do
 --  TODO: define events at which we should throw 'I2CErr'
 
 
--- |  Write an arbitrary amount of bytes until completion or NACK by slave. 
+-- |  Write an arbitrary number of bytes until completion or NACK by slave. 
 --    Returns the number of bytes written.
 --
 --    May throw 'I2CErr'. 
@@ -191,9 +191,10 @@ writeSome chip sizeW pokeW =
     throwIO $ errI2C eNOSYS "writeSome not implemented on Linux"
 {-# WARNING writeSome "Not implemented on Linux; throws 'I2CErr'" #-}
 
--- |  Read until NACK by slave or the specific amount of bytes have been read.
---    The reading can be prefixed by a write of a given amount of bytes 
---    if that size is non-zero. 
+
+-- |  Read until NACK by slave or the specific number of bytes have been read.
+--    The read operation will be preceeded by a write operation of a given 
+--    number of bytes if that size is non-zero. 
 --
 --    It is very encouraged that the backend implement this as a "repeated START" 
 --    transaction, since that's the whole reason for the write parameter. 

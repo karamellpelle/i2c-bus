@@ -6,9 +6,9 @@ you need access to low level functionality provided by your backend.
 
 ## Features
 * Connections to chips on I2C buses.
-* An exception type `I2CErr`.
 * A module `I2C.Raw` to perform direct write and read using `Storable` types.
 * A module `I2C.Register` to work with chips that use registers. 
+* An exception type `I2CErr`.
 * Types for binary serialization between host architecture and chip hardware.
 * Handy utilities through Template Haskell to define chips, registers and 
   (sub)fields of registers.
@@ -54,8 +54,8 @@ $(field ''MY8   "A_BIT"    "00*00000")
 $(register ''MYCHIP 0x33 "MY_A" ''A)
 -- ^ a register of type 'A' named MY_A at address 0x33. 
 --   this generates a value 'regMY_A :: Register MYCHIP A'. the type
---   'A' must be an instance of 'Storable', and the Storable implementation 
---   is relative to the chip hardware.
+--   'A' must be an instance of 'Storable', and its implementation has to
+--   be relative to the chip hardware.
 ~~~
 
 See [tests/GHCI.hs](tests/GHCI.hs) and [tests/ssd1306](tests/ssd1306) for more examples. 

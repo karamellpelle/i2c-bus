@@ -11,6 +11,7 @@
 -- EEPROMs use 2 bytes in big endian for addressing. "I2C.Types" has endian variants 
 -- to be used for this purpose.
 --------------------------------------------------------------------------------
+{-# OPTIONS_GHC -Wno-deprecations #-}
 module I2C.Raw
 (
     -- * 
@@ -25,6 +26,7 @@ import Foreign
 
 import I2C.Internal qualified as Internal
 import I2C.Chip
+
 
 ----------------------------------------------------------------------------------
 -- raw read and write without registers
