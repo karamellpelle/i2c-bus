@@ -3,7 +3,7 @@
 name:
     i2c-bus
 version:
-    0.0.6
+    0.1.0
 github:
     karamellpelle/i2c-bus
 homepage:
