@@ -200,7 +200,7 @@ instanceChip ty = do
 
 -- | Declare a 'Register' of a chip. 
 --   The data type of the register has to implement 'Storable',
---   and this implemetation is relative to the chip's hardware.
+--   and this implemetation has to be relative to the chip's hardware.
 --
 -- > $(register ''MPU6050 0x41 "TEMP_OUT" ''TemperatureC)
 -- > ======>

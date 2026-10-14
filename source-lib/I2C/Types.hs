@@ -256,7 +256,7 @@ instance Storable Int64BE where
 --------------------------------------------------------------------------------
 --  Storable pair
 
--- | A storable representation of 'a' and 'b' on a chip
+-- | A storable representation of types 'a' and 'b' on a chip
 data StorableAB a b = 
     StorableAB a b
 
