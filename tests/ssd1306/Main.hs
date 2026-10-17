@@ -31,6 +31,7 @@ import Codec.Picture
 import Codec.Picture.Gif
 import Data.ByteString qualified as BS
 import Control.Concurrent (threadDelay)
+import Control.Exception
 
 
 --------------------------------------------------------------------------------
@@ -44,19 +45,27 @@ import Control.Concurrent (threadDelay)
 
 main :: IO ()
 main = do
-    ssd <- openSSD1306 "/dev/i2c-1"
-    ssd1306Init ssd
+    res <- try @SomeException $ do
+        ssd <- openSSD1306 "/dev/i2c-1"
+        ssd1306Init ssd
 
-    display ssd =<< loadGIF "tests/ssd1306/haskell-128x32.gif"
-    
+        display ssd =<< loadGIF "tests/ssd1306/haskell-128x32.gif"
+        
+    case res of 
+        Left err  -> putTextLn $ show err
+        Right _   -> pure ()
+
     where
-      display ssd frames = display' ssd frames frames
-      display' ssd frames ((img, delay):fs) = do
+      loops = 4 :: Word
+      display :: SSD1306 -> [GIFFrame] -> IO ()
+      display ssd frames = display' 0 ssd frames frames
+      display' i ssd frames ((img, delay):fs) = do
           ssd1306Image ssd $ fromDynamicImage img
-          threadDelay $ fromIntegral $ delay * 10000
-          display' ssd frames fs
-      display' ssd frames [] =
-          display' ssd frames frames
+          threadDelay $ delay * 10000
+          display' i ssd frames fs
+      display' i ssd frames []
+          | i == loops = pure ()
+          | otherwise  = display' (succ i) ssd frames frames
     
 
 --------------------------------------------------------------------------------
@@ -74,9 +83,12 @@ type GIFFrame = (DynamicImage, GifDelay)
 loadGIF :: FilePath -> IO [GIFFrame]
 loadGIF path = do
     bs <- BS.readFile path
-    let Right imgs   = decodeGifImages bs
-        Right delays = getDelaysGifImages bs
-
-    pure $ zip imgs delays
+    let mab = do
+          imgs <- decodeGifImages bs
+          delays <- getDelaysGifImages bs
+          pure (imgs, delays)
+    case mab of 
+        Left err             -> (putTextLn $ toText err) >> pure mempty
+        Right (imgs, delays) -> pure $ zip imgs delays
             
 
